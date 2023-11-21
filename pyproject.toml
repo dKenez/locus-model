@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "locus-model"
+version = "0.0.1"
+description = "LOCUS aims to automate GeoGuessr with Deep Learning. This repository contains the code for the Deep Learning model."
+keywords = ["deep learning", "machine learning", "model", "locus", "geoguessr"]
+authors = [
+    { name = "Krist\u00f3f Ken\u00e9z Drexler", email = "k.k.drexler@gmail.com" },
+]
+maintainers = [
+    { name = "Krist\u00f3f Ken\u00e9z Drexler", email = "k.k.drexler@gmail.com" },
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = "~=3.11"
+dynamic = ["dependencies", "optional-dependencies"]
+
+[tool.setuptools]
+packages = ["locus-model"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.dynamic.optional-dependencies]
+dev = { file = ['requirements_dev.txt'] }
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # Pycodestyle
+    "E",
+    "W",
+    # isort
+    "I001",
+]
