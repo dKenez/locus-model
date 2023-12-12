@@ -2,7 +2,7 @@
 
 # imports
 from src.utils.constants import data_units
-from src.utils.converter import convert_data_size
+from src.utils.converter import convert_data_size, pick_auto_data_size
 
 
 def format_data_size(size: int | float, to: str = "auto", base: str = "B", *, precision: int = 0) -> str:
@@ -20,12 +20,7 @@ def format_data_size(size: int | float, to: str = "auto", base: str = "B", *, pr
 
     # if to is auto, detect which unit it is
     if to == "auto":
-        # loop through the units
-        for unit in data_units.keys():
-            # check if the size is bigger than the unit
-            if size >= data_units[unit] and len(unit) < 3:
-                # set the base
-                to = unit
+        to = pick_auto_data_size(size)
 
     # check if the base is valid
     if base not in data_units.keys():

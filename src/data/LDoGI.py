@@ -1,4 +1,5 @@
 # imports
+import json
 import os
 from pathlib import Path
 from typing import Callable, Generator, Iterator
@@ -10,6 +11,7 @@ from tqdm import tqdm
 from src.utils.console import console
 from src.utils.formatter import format_data_size
 from src.utils.paths import processed_data_dir, raw_data_dir
+from src.utils.types import DescribeJsonStructure
 
 
 def extract_from_shard(shard: Path) -> pl.DataFrame:
@@ -81,6 +83,101 @@ def delete_processed_data(dir: str | Path = processed_data_dir / "LDoGI", *, ver
         console.print(f"Deleted {len(files)} files")
 
 
+def update_describe_data(describe_data: DescribeJsonStructure, file_name: str, count: int) -> DescribeJsonStructure:
+    """Update the describe data.
+
+    Args:
+        describe_data (DescribeJsonStructure): describe data
+        file_name (str): name of the file
+        count (int): number of records in the file
+
+    Returns:
+        DescribeJsonStructure: updated describe data
+    """
+
+    # update the count
+    describe_data["count"] += count
+
+    # update the files
+    describe_data["files"].append(
+        {
+            "name": file_name,
+            "count": count,
+            "min_index": describe_data["files"][-1]["max_index"] + 1 if len(describe_data["files"]) > 0 else 0,
+            "max_index": describe_data["files"][-1]["max_index"] + count
+            if len(describe_data["files"]) > 0
+            else count - 1,
+        }
+    )
+
+    # return the updated describe data
+    return describe_data
+
+
+def write_description(describe_data: DescribeJsonStructure, *, dst_dir: str | Path = processed_data_dir / "LDoGI"):
+    """Write the describe data to a JSON file.
+
+    Args:
+        describe_data (DescribeJsonStructure): describe data
+        dst_dir (str | Path, optional): path to the processed data directory where the JSON file will be stored.
+            Defaults to processed_data_dir / "LDoGI".
+    """
+
+    # convert to path objects
+    dst_dir = Path(dst_dir)
+
+    # check if dst dir exists, create if not
+    if not dst_dir.is_dir():
+        dst_dir.mkdir(parents=True)
+
+    # define the describe file
+    describe_file = dst_dir / "describe.json"
+
+    # write the describe file
+    with open(describe_file, "w") as f:
+        json.dump(describe_data, f, indent=4)
+
+def regenerate_description(dst_dir: str | Path = processed_data_dir / "LDoGI"):
+    """Regenerate the describe data JSON file.
+
+    Args:
+        dst_dir (str | Path, optional): path to the processed data directory where the JSON file will be stored.
+            Defaults to processed_data_dir / "LDoGI".
+    """
+
+    # convert to path objects
+    dst_dir = Path(dst_dir)
+
+    # check if dst dir exists, create if not
+    if not dst_dir.is_dir():
+        dst_dir.mkdir(parents=True)
+
+    # define the describe file
+    describe_file = dst_dir / "describe.json"
+
+    # delete the describe file if it exists
+    if describe_file.is_file():
+        os.remove(describe_file)
+
+    # define the describe data
+    describe_data = DescribeJsonStructure(count=0, files=[])
+
+    # get the files
+    files = list(dst_dir.glob("*.parquet"))
+
+    # loop through the files
+    for file in tqdm(files):
+        # read the file
+        data = pl.read_parquet(file)
+
+        # update the describe data
+        describe_data = update_describe_data(describe_data, file.stem, data.shape[0])
+
+    # write the describe file
+    with open(describe_file, "w") as f:
+        json.dump(describe_data, f, indent=4)
+
+
 def process_raw_data(
     src_dir: str | Path = raw_data_dir / "LDoGI/shards",
     dst_dir: str | Path = processed_data_dir / "LDoGI",
@@ -88,6 +185,7 @@ def process_raw_data(
     verbose: bool = True,
     delete_existing: bool = False,
     filter_files: Callable[[str | Path], bool] | None = None,
+    describe: bool = True,
 ):
     """Process raw data of the LDoGI dataset into a more convenient parquet format.
 
@@ -131,9 +229,13 @@ def process_raw_data(
     msgpack_files: Iterator[Path] | Generator[Path, None, None] = src_dir.glob("*.msg")
     msgpack_files = filter(filter_files, msgpack_files) if filter_files else msgpack_files
 
+    # setup verbose accounting
     file_count = 0
     src_sum_size = 0
     dst_sum_size = 0
+
+    # setup describe data
+    describe_data = DescribeJsonStructure(count=0, files=[])
 
     for msgpack_file in tqdm(list(msgpack_files)):
         # get the name of the file
@@ -152,6 +254,12 @@ def process_raw_data(
         file_count += 1
         src_sum_size += os.path.getsize(msgpack_file)
         dst_sum_size += os.path.getsize(parquet_file)
+
+        # update the describe data
+        describe_data = update_describe_data(describe_data, file_name, data.shape[0])
+
+    if describe:
+        write_description(describe_data, dst_dir=dst_dir)
 
     # print some stats
     if verbose:

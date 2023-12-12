@@ -7,7 +7,14 @@ import src.data.LDoGI as ldogi
 @click.command()
 @click.option("--dataset", default="LDoGI", help="Number of greetings.")
 def main(dataset: str):
-    """Process a raw dataset into a more convenient format."""
+    """Process a raw dataset into a more convenient format.
+
+    Args:
+        dataset (str): name of the dataset to process
+
+    Raises:
+        ValueError: if dataset is not supported
+    """
 
     match dataset.lower():
         case "ldogi":

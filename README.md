@@ -37,7 +37,7 @@ The directory structure of the project looks like this:
 │
 ├── tests                <- Test files
 │
-├── locus-model  <- Source code for use in this project.
+├── src                  <- Source code for use in this project.
 │   │
 │   ├── __init__.py      <- Makes folder a Python module
 │   │
@@ -52,6 +52,13 @@ The directory structure of the project looks like this:
 │   ├── visualization    <- Scripts to create exploratory and results oriented visualizations
 │   │   ├── __init__.py
 │   │   └── visualize.py
+│   ├── utils            <- Convenience functions for converting, formatting, etc.
+│   │   ├── __init__.py
+│   │   ├── console.py   <- Console object for rich printing
+│   │   ├── contants.py  <- Useful constants
+│   │   ├── converter.py <- Functions for converting between different formats
+│   │   ├── formatter.py <- Functions for formatting data
+│   │   └── paths.py     <- Useful path definitions
 │   ├── train_model.py   <- script for training the model
 │   └── predict_model.py <- script for predicting from a model
 │
