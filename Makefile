@@ -3,8 +3,8 @@
 #################################################################################
 
 PROJECT_NAME = locus-model
-PYTHON_VERSION = 3.11
-PYTHON_INTERPRETER = python
+PYTHON_VERSION = 3.12
+PYTHON_INTERPRETER = python3
 
 #################################################################################
 # COMMANDS                                                                      #
@@ -20,7 +20,7 @@ create_environment:
 requirements:
 	$(PYTHON_INTERPRETER) -m pip install -U pip setuptools wheel
 	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
-	$(PYTHON_INTERPRETER) -m pip install .
+	$(PYTHON_INTERPRETER) -m pip install -e .
 
 ## Install Developer Python Dependencies
 .PHONY: dev_requirements
@@ -32,7 +32,6 @@ dev_requirements: requirements
 clean:
 	find . -type f -name "*.py[co]" -delete
 	find . -type d -name "__pycache__" -delete
-
 
 #################################################################################
 # PROJECT RULES                                                                 #

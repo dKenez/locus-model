@@ -11,7 +11,7 @@ from tqdm import tqdm
 from src.utils.console import console
 from src.utils.formatter import format_data_size
 from src.utils.paths import processed_data_dir, raw_data_dir
-from src.utils.types import DescribeJsonStructure
+from src.utils.interfaces import DescribeJsonStructure
 
 
 def extract_from_shard(shard: Path) -> pl.DataFrame:
