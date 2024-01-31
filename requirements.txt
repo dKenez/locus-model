@@ -4,3 +4,4 @@ polars==0.20.6
 rich==13.7.0
 torch==2.3.0.dev20240129+cu121
 tqdm==4.66.1
+matplotlib==3.8.2
