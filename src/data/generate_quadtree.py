@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 from mpl_toolkits.basemap import Basemap
+from tqdm import tqdm
 
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 from src.utils.pl_utils import batch_iter
@@ -18,7 +19,7 @@ ARCTIC_ANTARCTIC_CIRCLE = 66.57
 
 # polars filter out coordinates abovce the arctic circle and below the antarctic circle
 # so we need to filter them out manually
-df = df.filter((pl.col("latitude") < ARCTIC_ANTARCTIC_CIRCLE) & (pl.col("latitude") > -ARCTIC_ANTARCTIC_CIRCLE))
+# df = df.filter((pl.col("latitude") < ARCTIC_ANTARCTIC_CIRCLE) & (pl.col("latitude") > -ARCTIC_ANTARCTIC_CIRCLE))
 
 c = df.select(pl.len()).collect()
 print(c["len"][0])
@@ -28,7 +29,7 @@ coords = df.first().collect().to_dict(as_series=False)
 
 # lon_0 is central longitude of projection.
 # resolution = 'c' means use crude resolution coastlines.
-m = Basemap(projection="robin", lon_0=0, resolution="c")
+m = Basemap(projection="robin", lon_0=0, resolution="c", width=12000000000, height=9000000000)
 m.drawcoastlines()
 m.fillcontinents(color="coral", lake_color="aqua")
 # draw parallels and meridians.
@@ -39,13 +40,13 @@ m.drawmapboundary(fill_color="aqua")
 # iterating over df
 all_rows = 0
 print("iterating over df")
-for coords in batch_iter(df):
+for coords in tqdm(batch_iter(df), total=4225699//1000):
     longs = coords["longitude"].to_numpy()
     lats = coords["latitude"].to_numpy()
 
     x, y = m(coords["longitude"], coords["latitude"])
 
-    m.plot(x, y, "bo", markersize=1)  # plot a blue dot there
+    m.plot(x, y, "b.", markersize=1)  # plot a blue dot there
 plt.title("Robinson Projection")
 # plt.show()
 print(PROJECT_ROOT / "reports" / "figures" / "test.png")
