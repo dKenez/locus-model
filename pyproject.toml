@@ -25,7 +25,7 @@ packages = ["src"]
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
-dev = { file = ['requirements_dev.txt'] }
+dev = { file = ["requirements_dev.txt"] }
 
 [tool.ruff]
 select = ["ALL"]
@@ -44,6 +44,5 @@ select = [
 
 
 [[tool.mypy.overrides]]
-module = 'msgpack'
+module = ["msgpack", "mpl_toolkits.basemap"]
 ignore_missing_imports = true
-

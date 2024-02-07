@@ -37,9 +37,10 @@ def geo_rect_to_proj(lats: tuple[float, float], lons: tuple[float, float], m: Ba
     x, y = m(geo_rect_lons, geo_rect_lats)
 
     xy = zip(x, y)
+    return xy
     # get random color
-    colors = ["green", "blue", "red", "yellow", "purple", "orange", "black"]
-    facecolor = np.random.choice(colors)
+    # colors = ["green", "blue", "red", "yellow", "purple", "orange", "black"]
+    # facecolor = np.random.choice(colors)
 
     # poly = Polygon(list(xy), facecolor=facecolor, alpha=0.4)
     # plt.gca().add_patch(poly)
