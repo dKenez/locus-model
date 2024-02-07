@@ -191,7 +191,9 @@ class QuadTree(nx.DiGraph):
         """Initialize a QuadTree. Has a single root node with state CellState.EVALUATING.
 
         Args:
-            incoming_graph_data (_type_, optional): Data for initialising the base directed graph with custom parameters.
+            incoming_graph_data (_type_, optional): Data for initialising the base directed graph with
+            custom parameters.
+
             Defaults to None.
         """
         super().__init__(incoming_graph_data, **attr)
