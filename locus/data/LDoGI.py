@@ -8,10 +8,10 @@ import msgpack
 import polars as pl
 from tqdm import tqdm
 
-from src.utils.console import console
-from src.utils.formatter import format_data_size
-from src.utils.interfaces import DescribeJsonStructure
-from src.utils.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR
+from locus.utils.console import console
+from locus.utils.formatter import format_data_size
+from locus.utils.interfaces import DescribeJsonStructure
+from locus.utils.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR
 
 
 def extract_from_shard(shard: Path) -> pl.DataFrame:
@@ -72,7 +72,7 @@ def delete_processed_data(dir: str | Path = PROCESSED_DATA_DIR / "LDoGI", *, ver
         raise FileNotFoundError(f"dir not found: {dir}")
 
     # get the files
-    files = list(dir.glob("*.parquet"))
+    files = list(dir.glob("*"))
 
     # delete the files
     for file in files:
@@ -205,22 +205,23 @@ def process_raw_data(
 
     # convert to path objects
     src_dir = Path(src_dir)
-    dst_dir = Path(dst_dir)
+    shard_dir = Path(dst_dir) / "shards"
+    desc_dir = Path(dst_dir)
 
     # check if src dir exists
     if not src_dir.is_dir():
         raise FileNotFoundError(f"src_dir not found: {src_dir}")
 
     # check if dst dir exists, create if not
-    if not dst_dir.is_dir():
-        dst_dir.mkdir(parents=True)
+    if not shard_dir.is_dir():
+        shard_dir.mkdir(parents=True)
 
     # delete existing files if requested
     if delete_existing:
-        delete_processed_data(dst_dir, verbose=verbose)
+        delete_processed_data(shard_dir, verbose=verbose)
 
     # check if dst dir is empty
-    dst_dir_files = len(list(dst_dir.glob("*.parquet"))) > 0
+    dst_dir_files = len(list(shard_dir.glob("*.parquet"))) > 0
     if dst_dir_files > 0:
         raise FileExistsError(
             f"dst_dir is not empty, found {dst_dir_files} files. If you want to overwrite them,\
@@ -246,7 +247,7 @@ def process_raw_data(
         data = extract_from_shard(msgpack_file)
 
         # define the parquet file
-        parquet_file = dst_dir / f"{file_name}.parquet"
+        parquet_file = shard_dir / f"{file_name}.parquet"
 
         # save the data as a parquet file
         data.write_parquet(parquet_file)
@@ -260,7 +261,7 @@ def process_raw_data(
         describe_data = update_describe_data(describe_data, file_name, data.shape[0])
 
     if describe:
-        write_description(describe_data, dst_dir=dst_dir)
+        write_description(describe_data, dst_dir=desc_dir)
 
     # print some stats
     if verbose:

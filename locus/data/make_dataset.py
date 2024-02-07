@@ -1,7 +1,7 @@
 # imports
 import click
 
-import src.data.LDoGI as ldogi
+import locus.data.LDoGI as ldogi
 
 
 @click.command()

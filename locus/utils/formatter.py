@@ -1,8 +1,8 @@
 # Formatters for various data types
 
 # imports
-from src.utils.constants import data_units
-from src.utils.converter import convert_data_size, pick_auto_data_size
+from locus.utils.constants import data_units
+from locus.utils.converter import convert_data_size, pick_auto_data_size
 
 
 def format_data_size(size: int | float, to: str = "auto", base: str = "B", *, precision: int = 0) -> str:
@@ -39,7 +39,7 @@ def format_data_size(size: int | float, to: str = "auto", base: str = "B", *, pr
 
 if __name__ == "__main__":
     # imports
-    from src.utils.console import console
+    from locus.utils.console import console
 
     # test if format_data_size works
     print(format_data_size(1024))

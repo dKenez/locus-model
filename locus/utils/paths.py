@@ -11,7 +11,7 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
 if __name__ == "__main__":
-    from src.utils.console import console
+    from locus.utils.console import console
 
     # Check paths
     console.print(f"{PROJECT_ROOT=}")

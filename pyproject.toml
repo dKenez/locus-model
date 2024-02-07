@@ -19,7 +19,7 @@ requires-python = "~=3.11"
 dynamic = ["dependencies", "optional-dependencies"]
 
 [tool.setuptools]
-packages = ["src"]
+packages = ["locus"]
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }

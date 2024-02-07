@@ -1,7 +1,7 @@
 # Converters for various things
 
 # imports
-from src.utils.constants import data_units
+from locus.utils.constants import data_units
 
 
 def pick_auto_data_size(size: int | float, base: str = "B") -> str:
@@ -55,7 +55,7 @@ def convert_data_size(size: int | float, to: str = "auto", base: str = "B") -> f
 
 if __name__ == "__main__":
     # imports
-    from src.utils.console import console
+    from locus.utils.console import console
 
     # test if format_data_size works
     print(convert_data_size(1024))

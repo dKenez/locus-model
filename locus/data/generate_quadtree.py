@@ -10,8 +10,8 @@ from rich.align import Align
 from rich.live import Live
 from rich.table import Table
 
-from src.data.QuadTree import CellState, QuadTree
-from src.utils.paths import PROCESSED_DATA_DIR
+from locus.data.QuadTree import CellState, QuadTree
+from locus.utils.paths import PROCESSED_DATA_DIR
 
 
 def setup_table():
@@ -79,8 +79,8 @@ def update_table(tree: QuadTree, table: Table, prev_evaluating: int):
     pct_stopped = 100 * curr_stopped / (curr_active + curr_evaluating + curr_stopped)
 
     table.columns[1].footer = f"[green]{pct_active:.2f}%[/]"
-    table.columns[2].footer = f"[red]{pct_evaluating:.2f}%[/]"
-    table.columns[3].footer = f"[blue]{pct_stopped:.2f}%[/]"
+    table.columns[2].footer = f"[blue]{pct_evaluating:.2f}%[/]"
+    table.columns[3].footer = f"[red]{pct_stopped:.2f}%[/]"
 
     return curr_evaluating
 
@@ -143,17 +143,17 @@ def main(shards: tuple[str], tau_min: int, tau_max: int, output: str):
         raise ValueError("tau_min must be larger than 0")
 
     # check if quadtrees directory exists else create it
-    quadtrees_dir = PROCESSED_DATA_DIR / "quadtrees"
+    quadtrees_dir = PROCESSED_DATA_DIR / "LDoGI" / "quadtrees"
     quadtrees_dir.mkdir(parents=True, exist_ok=True)
 
     shard_files: Path | list[Path]
     if len(shards) == 0:
-        shard_files = PROCESSED_DATA_DIR / "LDoGI" / "shard_*.parquet"
+        shard_files = PROCESSED_DATA_DIR / "LDoGI/shards/shard_*.parquet"
     else:
         if "all" in shards:
-            shard_files = PROCESSED_DATA_DIR / "LDoGI" / "shard_*.parquet"
+            shard_files = PROCESSED_DATA_DIR / "LDoGI/shards/shard_*.parquet"
         else:
-            shard_files = [PROCESSED_DATA_DIR / "LDoGI" / f"shard_{shard}.parquet" for shard in shards]
+            shard_files = [PROCESSED_DATA_DIR / f"LDoGI/shards/shard_{shard}.parquet" for shard in shards]
 
     df = pl.scan_parquet(shard_files)
     df = df.drop("id", "image")
