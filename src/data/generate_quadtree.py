@@ -1,6 +1,6 @@
 import time
 from enum import Enum
-from typing import List
+from pathlib import Path
 
 import click
 import networkx as nx
@@ -30,7 +30,7 @@ class CellState(Enum):
 
 def cell_bounds(cell: str):
     """Given a cell identifier, return the bounds of the cell in the form
-    (west longitude, east longitude, south latitude, north latitude).
+    (south latitude, north latitude, west longitude, east longitude).
 
 
 
@@ -38,13 +38,13 @@ def cell_bounds(cell: str):
         cell (str): Cell identifier string, corresponds to a path in the quadtree.
 
     Returns:
-        tuple: (west longitude, east longitude, south latitude, north latitude)
+        tuple: (south latitude, north latitude, west longitude, east longitude)
     """
     # Initialize bounds to the entire world
-    west_long = -180.0
-    east_long = 180.0
     south_lat = -90.0
     north_lat = 90.0
+    west_lon = -180.0
+    east_lon = 180.0
 
     # For each character in the cell identifier, update the bounds by entering the corresponding quadrant
     for divide in cell:
@@ -54,74 +54,67 @@ def cell_bounds(cell: str):
             north_lat = (south_lat + north_lat) / 2
 
         if int(divide) % 2 == 0:  # 0 or 2 is west
-            east_long = (west_long + east_long) / 2
+            east_lon = (west_lon + east_lon) / 2
         else:  # 1 or 3 is east
-            west_long = (west_long + east_long) / 2
+            west_lon = (west_lon + east_lon) / 2
 
-    return west_long, east_long, south_lat, north_lat
+    return south_lat, north_lat, west_lon, east_lon
 
 
-def is_in_cell(cell: str, lat: float, long: float):
+def is_in_cell(cell: str, lat: float, lon: float):
     """Check if a given latitude and longitude is within a given cell.
 
     Args:
         cell (str): Cell identifier string, corresponds to a path in the quadtree.
         lat (float): Latitude of the point to check.
-        long (float): Longitude of the point to check.
+        lon (float): Longitude of the point to check.
 
     Returns:
         bool: True if the point is within the cell, False otherwise.
     """
-    west_long, east_long, south_lat, north_lat = cell_bounds(cell)
-    return west_long <= long <= east_long and south_lat <= lat <= north_lat
+    south_lat, north_lat, west_lon, east_lon = cell_bounds(cell)
+    return south_lat <= lat < north_lat and west_lon <= lon < east_lon
 
 
-def calc_enclosing_cell(lon: float, lat: float, active_cells: List[str]):
+def calc_enclosing_cell(lat: float, lon: float, active_cells: list[str]):
     """
     Given a point (lon, lat) and a graph, return the cell that encloses the point.
     If the point is not enclosed by any cell, return None.
 
     Args:
-        lon (float): Input longitude.
         lat (float): Input latitude.
-        active_cells (List[str]): List of active cells in the graph.
+        lon (float): Input longitude.
+        active_cells (list[str]): List of active cells in the graph.
 
     Returns:
         (str | None): The cell that encloses the point, or None if the point is not enclosed by any cell.
     """
 
-    def get_next_cell(lon: float, lat: float, west_lon: float, east_lon: float, south_lat: float, north_lat: float):
+    def get_next_cell(lat: float, lon: float, south_lat: float, north_lat: float, west_lon: float, east_lon: float):
         """Given a point (lon, lat) and the bounds of a cell, return the quadrant of the cell that the point is in,
         and the bounds of the new cell that the point is in.
 
         Args:
-            lon (float): Input longitude.
             lat (float): Input latitude.
-            west_lon (float): West bounary of the cell.
-            east_lon (float): East boundary of the cell.
+            lon (float): Input longitude.
             south_lat (float): South boundary of the cell.
             north_lat (float): North boundary of the cell.
+            west_lon (float): West bounary of the cell.
+            east_lon (float): East boundary of the cell.
 
         Returns:
             tuple[Literal[3, 2, 1, 0], tuple[float, float, float, float]]: The quadrant of the cell that
-                the point is in, and the bounds of the new cell that the point is in.
+                the point is in, and the bounds of the new cell that the point is in (south latitude, north latitude,
+                west longitude, east longitude).
         """
 
         # Initialize return values to the input bounds
-        ret_west_lon = west_lon
-        ret_east_lon = east_lon
         ret_south_lat = south_lat
         ret_north_lat = north_lat
+        ret_west_lon = west_lon
+        ret_east_lon = east_lon
 
         quad = 0
-
-        # Determine the horizontal half of the cell that the point is in
-        half_lon = (west_lon + east_lon) / 2
-        if lon > half_lon:
-            quad += 1
-            ret_west_lon = half_lon
-        else:
-            ret_east_lon = half_lon
 
         # Determine the vertical half of the cell that the point is in
         half_lat = (south_lat + north_lat) / 2
@@ -131,21 +124,29 @@ def calc_enclosing_cell(lon: float, lat: float, active_cells: List[str]):
         else:
             ret_south_lat = half_lat
 
-        return quad, (ret_west_lon, ret_east_lon, ret_south_lat, ret_north_lat)
+        # Determine the horizontal half of the cell that the point is in
+        half_lon = (west_lon + east_lon) / 2
+        if lon > half_lon:
+            quad += 1
+            ret_west_lon = half_lon
+        else:
+            ret_east_lon = half_lon
+
+        return quad, (ret_south_lat, ret_north_lat, ret_west_lon, ret_east_lon)
 
     # Initialize bounds to the entire world
-    west_lon = -180
-    east_lon = 180
     south_lat = -90
     north_lat = 90
+    west_lon = -180
+    east_lon = 180
 
     cell = ""
     cell_pool = [c for c in active_cells]  # Make a copy of the active cells
 
     # While there are still cells to check...
     while True:
-        quad, (west_lon, east_lon, south_lat, north_lat) = get_next_cell(
-            lon, lat, west_lon, east_lon, south_lat, north_lat
+        quad, (south_lat, north_lat, west_lon, east_lon) = get_next_cell(
+            lat, lon, south_lat, north_lat, west_lon, east_lon
         )
 
         # Build the cell identifier
@@ -237,12 +238,12 @@ class QuadTree(nx.DiGraph):
                 continue
 
             # Get the bounds of the cell and filter the dataframe to only include points within the cell
-            west_long, east_long, south_lat, north_lat = cell_bounds(node_id)
+            south_lat, north_lat, west_lon, east_lon = cell_bounds(node_id)
             filtered_df = df.filter(
-                (pl.col("latitude") < north_lat)
-                & (pl.col("latitude") > south_lat)
-                & (pl.col("longitude") < east_long)
-                & (pl.col("longitude") > west_long)
+                (pl.col("latitude") > south_lat)
+                & (pl.col("latitude") < north_lat)
+                & (pl.col("longitude") > west_lon)
+                & (pl.col("longitude") < east_lon)
             )
 
             count_in_cell = filtered_df.count().collect()["latitude"][0]
@@ -264,14 +265,14 @@ class QuadTree(nx.DiGraph):
         """
         return CellState.EVALUATING in [node["state"] for node in self.nodes.values()]
 
-    def get_nodes(self, state: CellState) -> List[str]:
+    def get_nodes(self, state: CellState) -> list[str]:
         """Get all nodes in the graph with a given state.
 
         Args:
             state (CellState): The state to filter the nodes by.
 
         Returns:
-            list: List of nodes with the given state.
+            list[str]: List of nodes with the given state.
         """
         return [node for node in self.nodes.values() if node["state"] == state]
 
@@ -386,6 +387,7 @@ def main(shards: tuple[str], tau_min: int, tau_max: int, output: str):
     quadtrees_dir = PROCESSED_DATA_DIR / "quadtrees"
     quadtrees_dir.mkdir(parents=True, exist_ok=True)
 
+    shard_files: Path | list[Path]
     if len(shards) == 0:
         shard_files = PROCESSED_DATA_DIR / "LDoGI" / "shard_*.parquet"
     else:

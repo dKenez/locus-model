@@ -1,4 +1,4 @@
-from typing import List, TypedDict
+from typing import TypedDict
 
 
 class DescribeFileEntry(TypedDict):
@@ -22,11 +22,11 @@ class DescribeJsonStructure(TypedDict):
 
     Params:
         count (int): number of files
-        files (List[DescribeFileEntry]): list of file entries
+        files (list[DescribeFileEntry]): list of file entries
 
     See Also:
         DescribeFileEntry
     """
 
     count: int
-    files: List[DescribeFileEntry]
+    files: list[DescribeFileEntry]

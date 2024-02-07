@@ -10,8 +10,8 @@ from tqdm import tqdm
 
 from src.utils.console import console
 from src.utils.formatter import format_data_size
-from src.utils.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR
 from src.utils.interfaces import DescribeJsonStructure
+from src.utils.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR
 
 
 def extract_from_shard(shard: Path) -> pl.DataFrame:
@@ -27,7 +27,7 @@ def extract_from_shard(shard: Path) -> pl.DataFrame:
     # define lists to store the data
     ids = []
     lats = []
-    longs = []
+    lons = []
     ims = []
 
     # read the shard
@@ -35,14 +35,14 @@ def extract_from_shard(shard: Path) -> pl.DataFrame:
         for record in msgpack.Unpacker(infile, raw=False):
             ids.append(record["id"])
             lats.append(record["latitude"])
-            longs.append(record["longitude"])
+            lons.append(record["longitude"])
             ims.append(record["image"])
 
     # Define dataframe
     data = {
         "id": ids,
         "latitude": lats,
-        "longitude": longs,
+        "longitude": lons,
         "image": ims,
     }
     schema = {
@@ -136,6 +136,7 @@ def write_description(describe_data: DescribeJsonStructure, *, dst_dir: str | Pa
     # write the describe file
     with open(describe_file, "w") as f:
         json.dump(describe_data, f, indent=4)
+
 
 def regenerate_description(dst_dir: str | Path = PROCESSED_DATA_DIR / "LDoGI"):
     """Regenerate the describe data JSON file.
