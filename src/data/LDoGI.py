@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from src.utils.console import console
 from src.utils.formatter import format_data_size
-from src.utils.paths import processed_data_dir, raw_data_dir
+from src.utils.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR
 from src.utils.interfaces import DescribeJsonStructure
 
 
@@ -56,7 +56,7 @@ def extract_from_shard(shard: Path) -> pl.DataFrame:
     return pl.DataFrame(data, schema)
 
 
-def delete_processed_data(dir: str | Path = processed_data_dir / "LDoGI", *, verbose: bool = False):
+def delete_processed_data(dir: str | Path = PROCESSED_DATA_DIR / "LDoGI", *, verbose: bool = False):
     """Delete processed data of the LDoGI dataset.
 
     Args:
@@ -114,7 +114,7 @@ def update_describe_data(describe_data: DescribeJsonStructure, file_name: str, c
     return describe_data
 
 
-def write_description(describe_data: DescribeJsonStructure, *, dst_dir: str | Path = processed_data_dir / "LDoGI"):
+def write_description(describe_data: DescribeJsonStructure, *, dst_dir: str | Path = PROCESSED_DATA_DIR / "LDoGI"):
     """Write the describe data to a JSON file.
 
     Args:
@@ -137,7 +137,7 @@ def write_description(describe_data: DescribeJsonStructure, *, dst_dir: str | Pa
     with open(describe_file, "w") as f:
         json.dump(describe_data, f, indent=4)
 
-def regenerate_description(dst_dir: str | Path = processed_data_dir / "LDoGI"):
+def regenerate_description(dst_dir: str | Path = PROCESSED_DATA_DIR / "LDoGI"):
     """Regenerate the describe data JSON file.
 
     Args:
@@ -179,8 +179,8 @@ def regenerate_description(dst_dir: str | Path = processed_data_dir / "LDoGI"):
 
 
 def process_raw_data(
-    src_dir: str | Path = raw_data_dir / "LDoGI/shards",
-    dst_dir: str | Path = processed_data_dir / "LDoGI",
+    src_dir: str | Path = RAW_DATA_DIR / "LDoGI/shards",
+    dst_dir: str | Path = PROCESSED_DATA_DIR / "LDoGI",
     *,
     verbose: bool = True,
     delete_existing: bool = False,
@@ -271,7 +271,7 @@ def process_raw_data(
 if __name__ == "__main__":
     # test if process_raw_data works
     process_raw_data(
-        dst_dir=processed_data_dir / "LDoGI/test",
+        dst_dir=PROCESSED_DATA_DIR / "LDoGI/test",
         delete_existing=True,
         filter_files=lambda x: Path(x).name in [f"shard_{i}.msg" for i in range(5)],
     )
