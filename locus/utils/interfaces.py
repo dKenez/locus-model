@@ -30,3 +30,41 @@ class DescribeJsonStructure(TypedDict):
 
     count: int
     files: list[DescribeFileEntry]
+
+
+class QuadTreeItemParams(TypedDict):
+    """Structure of the parameters of a QuadTree item.
+
+    Params:
+        tau_min (int): minimum tau value
+        tau_max (int): maximum tau value
+        shards (list[int]): list of shard IDs used to generate the QuadTree
+    """
+
+    tau_min: int
+    tau_max: int
+    shards: list[int]
+
+
+class QuadTreeItem(TypedDict):
+    """Structure of a QuadTree item.
+
+    Params:
+        name (str): name of the QuadTree item
+        params (QuadTreeItemParams): parameters used to generate the QuadTree
+        excluded_ids (list[int]): list of IDs with no corresponding cells in the QuadTree
+    """
+
+    name: str
+    params: QuadTreeItemParams
+    excluded_ids: list[int]
+
+
+class QuadTreeManifest(TypedDict):
+    """Structure of the QuadTree manifest JSON file.
+
+    Params:
+        quadtrees (list[QuadTreeItem]): list of QuadTree items
+    """
+
+    quadtrees: list[QuadTreeItem]

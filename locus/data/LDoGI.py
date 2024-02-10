@@ -14,7 +14,7 @@ from locus.utils.interfaces import DescribeJsonStructure
 from locus.utils.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR
 
 
-def extract_from_shard(shard: Path) -> pl.DataFrame:
+def extract_from_shard(shard: Path, *, first_id) -> pl.DataFrame:
     """Extract the data from a shard.
 
     Args:
@@ -25,7 +25,6 @@ def extract_from_shard(shard: Path) -> pl.DataFrame:
     """
 
     # define lists to store the data
-    ids = []
     lats = []
     lons = []
     ims = []
@@ -33,10 +32,12 @@ def extract_from_shard(shard: Path) -> pl.DataFrame:
     # read the shard
     with open(shard, "rb") as infile:
         for record in msgpack.Unpacker(infile, raw=False):
-            ids.append(record["id"])
             lats.append(record["latitude"])
             lons.append(record["longitude"])
             ims.append(record["image"])
+
+    # define ids
+    ids = list(range(first_id, first_id + len(lats)))
 
     # Define dataframe
     data = {
@@ -46,7 +47,7 @@ def extract_from_shard(shard: Path) -> pl.DataFrame:
         "image": ims,
     }
     schema = {
-        "id": pl.Utf8,
+        "id": pl.Int64,
         "latitude": pl.Float64,
         "longitude": pl.Float64,
         "image": pl.Binary,
@@ -228,8 +229,10 @@ def process_raw_data(
                   set delete_existing=True"
         )
 
-    msgpack_files: Iterator[Path] | Generator[Path, None, None] = src_dir.glob("*.msg")
-    msgpack_files = filter(filter_files, msgpack_files) if filter_files else msgpack_files
+    msgpack_files_glob = src_dir.glob("*.msg")
+    msgpack_files_filter = filter(filter_files, msgpack_files_glob) if filter_files else msgpack_files_glob
+    msgpack_files = [f for f in msgpack_files_filter]
+    msgpack_files.sort(key=lambda x: int(x.stem.split("_")[1]))
 
     # setup verbose accounting
     file_count = 0
@@ -239,12 +242,16 @@ def process_raw_data(
     # setup describe data
     describe_data = DescribeJsonStructure(count=0, files=[])
 
+    first_id = 0
     for msgpack_file in tqdm(list(msgpack_files)):
         # get the name of the file
         file_name = msgpack_file.stem
 
         # read the msgpack file
-        data = extract_from_shard(msgpack_file)
+        data = extract_from_shard(msgpack_file, first_id=first_id)
+
+        # update first_id
+        first_id += data.shape[0]
 
         # define the parquet file
         parquet_file = shard_dir / f"{file_name}.parquet"

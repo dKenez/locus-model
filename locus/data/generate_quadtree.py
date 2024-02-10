@@ -1,3 +1,4 @@
+import json
 import threading
 import time
 from pathlib import Path
@@ -21,6 +22,7 @@ def setup_table():
     table.add_column("Active Cells", "0%")
     table.add_column("Evaluating Cells", "100%")
     table.add_column("Stopped Cells", "0%")
+    table.add_column("Excluded data points", "0%")
     table.title = "Generating QuadTree..."
     table.row_styles = ["none", "dim"]
 
@@ -55,10 +57,11 @@ def update_time_thread(start_time, table, stop_flag):
         update_time(start_time, table)
 
 
-def update_table(tree: QuadTree, table: Table, prev_evaluating: int):
+def update_table(tree: QuadTree, table: Table, prev_evaluating: int, total_data_points: int):
     curr_active = len(tree.get_nodes(CellState.ACTIVE))
     curr_evaluating = len(tree.get_nodes(CellState.EVALUATING))
     curr_stopped = len(tree.get_nodes(CellState.STOPPED))
+    num_excluded = len(tree.excluded_ids)
 
     if curr_evaluating > prev_evaluating:
         s = "green"
@@ -72,15 +75,19 @@ def update_table(tree: QuadTree, table: Table, prev_evaluating: int):
         f"{curr_active}",
         f"[{s}]{curr_evaluating}[/]",
         f"{curr_stopped}",
+        f"{num_excluded}",
     )
 
     pct_active = 100 * curr_active / (curr_active + curr_evaluating + curr_stopped)
     pct_evaluating = 100 * curr_evaluating / (curr_active + curr_evaluating + curr_stopped)
     pct_stopped = 100 * curr_stopped / (curr_active + curr_evaluating + curr_stopped)
+    pct_stopped = 100 * curr_stopped / (curr_active + curr_evaluating + curr_stopped)
+    pct_excluded = 100 * num_excluded / total_data_points
 
     table.columns[1].footer = f"[green]{pct_active:.2f}%[/]"
     table.columns[2].footer = f"[blue]{pct_evaluating:.2f}%[/]"
     table.columns[3].footer = f"[red]{pct_stopped:.2f}%[/]"
+    table.columns[4].footer = f"[yellow]{pct_excluded:.2f}%[/]"
 
     return curr_evaluating
 
@@ -103,17 +110,19 @@ def partition_quadtree(tree: QuadTree, df: pl.LazyFrame, tau_min: int, tau_max: 
     start_time_thread.daemon = True
     start_time_thread.start()
 
+    total_data_points = df.count().collect()["latitude"][0]
+
     prev_evaluating = 0
     with Live(table_centered, refresh_per_second=4):  # update 4 times a second to feel fluid
         while tree.is_evaluating():
             # update_time(start_time, table)
-            prev_evaluating = update_table(tree, table, prev_evaluating)
+            prev_evaluating = update_table(tree, table, prev_evaluating, total_data_points)
 
             tree.expand()
             tree.evaluate_cells(df, tau_min, tau_max)
 
         # update_time(start_time, table)
-        update_table(tree, table, prev_evaluating)
+        update_table(tree, table, prev_evaluating, total_data_points)
 
     # Set the stop flag to signal the time update thread to exit
     stop_flag.set()
@@ -123,8 +132,8 @@ def partition_quadtree(tree: QuadTree, df: pl.LazyFrame, tau_min: int, tau_max: 
 
 @click.command()
 @click.argument("shards", required=False, nargs=-1)
-@click.option("--tau_min", default=50, help="Minimum number of data points in a cell.")
-@click.option("--tau_max", default=2000, help="Maximum number of data points in a cell.")
+@click.option("--tau-min", default=50, help="Minimum number of data points in a cell.")
+@click.option("--tau-max", default=2000, help="Maximum number of data points in a cell.")
 @click.option("--output", default="quadtree.gml", help="Output file for saving the QuadTree.")
 def main(shards: tuple[str], tau_min: int, tau_max: int, output: str):
     """Generate a quadtree from a dataset of image locations.
@@ -146,6 +155,12 @@ def main(shards: tuple[str], tau_min: int, tau_max: int, output: str):
     quadtrees_dir = PROCESSED_DATA_DIR / "LDoGI" / "quadtrees"
     quadtrees_dir.mkdir(parents=True, exist_ok=True)
 
+    # check if manifest.json exists else create it
+    manifest_file = quadtrees_dir / "manifest.json"
+    if not manifest_file.exists():
+        with open(manifest_file, "w") as f:
+            f.write('{"quadtrees": []}')
+
     shard_files: Path | list[Path]
     if len(shards) == 0:
         shard_files = PROCESSED_DATA_DIR / "LDoGI/shards/shard_*.parquet"
@@ -156,13 +171,34 @@ def main(shards: tuple[str], tau_min: int, tau_max: int, output: str):
             shard_files = [PROCESSED_DATA_DIR / f"LDoGI/shards/shard_{shard}.parquet" for shard in shards]
 
     df = pl.scan_parquet(shard_files)
-    df = df.drop("id", "image")
+    df = df.drop("image")
 
     g = QuadTree()
     partition_quadtree(g, df, tau_min, tau_max)
 
     output_path = quadtrees_dir / output
     g.write_gml(output_path)
+
+    # read the manifest.json file
+    with open(manifest_file, "r") as f:
+        manifest = json.load(f)
+
+    # add the new QuadTree to the manifest
+    manifest["quadtrees"].append(
+        {
+            "name": output,
+            "params": {
+                "tau_min": tau_min,
+                "tau_max": tau_max,
+                "shards": [int(shard) for shard in shards],
+            },
+            "excluded_ids": sorted(g.excluded_ids),
+        }
+    )
+
+    # write the manifest back to the file
+    with open(manifest_file, "w") as f:
+        json.dump(manifest, f, indent=4)
 
 
 if __name__ == "__main__":

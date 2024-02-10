@@ -5,22 +5,15 @@ import locus.data.LDoGI as ldogi
 
 
 @click.command()
-@click.option("--dataset", default="LDoGI", help="Name of the dataset to process.")
-def main(dataset: str):
+@click.option("--delete-existing", is_flag=True, help="Delete the existing data if present.", default=False)
+def main(delete_existing: bool):
     """Process a raw dataset into a more convenient format.
 
     Args:
-        dataset (str): Name of the dataset to process.
-
-    Raises:
-        ValueError: If dataset is not supported.
+        delete-existing (bool): Delete the existing data if present.
     """
 
-    match dataset.lower():
-        case "ldogi":
-            ldogi.process_raw_data()
-        case _:
-            raise ValueError(f"Dataset value of '{dataset}' is unsupported!")
+    ldogi.process_raw_data(delete_existing=delete_existing)
 
 
 if __name__ == "__main__":

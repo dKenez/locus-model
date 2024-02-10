@@ -180,6 +180,8 @@ class QuadTree(nx.DiGraph):
     3: South-East
     """
 
+    excluded_ids: list[int]
+
     def __init__(self, incoming_graph_data=None, **attr):
         """Initialize a QuadTree. Has a single root node with state CellState.EVALUATING.
 
@@ -191,6 +193,8 @@ class QuadTree(nx.DiGraph):
         """
         super().__init__(incoming_graph_data, **attr)
         self.add_node("", state=CellState.EVALUATING)
+
+        self.excluded_ids = []
 
     def expand(self):
         """Expand the quadtree by subdividing all cells in the evaluating state into 4 new cells."""
@@ -248,6 +252,9 @@ class QuadTree(nx.DiGraph):
                     node["state"] = CellState.ACTIVE
             else:
                 node["state"] = CellState.STOPPED
+
+                ids = filtered_df.collect()["id"].to_list()
+                self.excluded_ids.extend(ids)
 
     def is_evaluating(self):
         """Check if any cells in the graph are in the evaluating state.

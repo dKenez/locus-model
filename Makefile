@@ -38,9 +38,12 @@ clean:
 #################################################################################
 
 ## Make Dataset
+ifeq ($(delete_existing), 1)
+    CFLAGS += --delete-existing
+endif
 .PHONY: data
 data:
-	$(PYTHON_INTERPRETER) locus/data/make_dataset.py
+	$(PYTHON_INTERPRETER) locus/data/make_dataset.py $(CFLAGS)
 
 #################################################################################
 # Documentation RULES                                                           #
