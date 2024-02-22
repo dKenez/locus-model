@@ -177,7 +177,7 @@ def main(shards: tuple[str], tau_min: int, tau_max: int, output: str):
     partition_quadtree(g, df, tau_min, tau_max)
 
     output_path = quadtrees_dir / output
-    g.write_gml(output_path)
+    g.write_gml(f"{output_path}.gml")
 
     # read the manifest.json file
     with open(manifest_file, "r") as f:

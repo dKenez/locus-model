@@ -44,5 +44,5 @@ select = [
 
 
 [[tool.mypy.overrides]]
-module = ["msgpack", "mpl_toolkits.basemap"]
+module = ["msgpack", "mpl_toolkits.basemap", "torchvision.transforms"]
 ignore_missing_imports = true

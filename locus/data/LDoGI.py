@@ -2,7 +2,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Callable, Generator, Iterator
+from typing import Callable
 
 import msgpack
 import polars as pl
