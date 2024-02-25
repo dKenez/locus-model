@@ -11,10 +11,10 @@ from tqdm import tqdm
 from locus.utils.console import console
 from locus.utils.formatter import format_data_size
 from locus.utils.interfaces import DescribeJsonStructure
-from locus.utils.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR
+from locus.utils.paths import PROCESSED_DATA_DIR, RAW_DATA_DIRfor i, (images, labels) in 
 
 
-def extract_from_shard(shard: Path, *, first_id) -> pl.DataFrame:
+def extract_data_shard2shard(shard: Path, *, first_id) -> pl.DataFrame:
     """Extract the data from a shard.
 
     Args:
@@ -48,6 +48,44 @@ def extract_from_shard(shard: Path, *, first_id) -> pl.DataFrame:
     }
     schema = {
         "id": pl.Int64,
+        "latitude": pl.Float64,
+        "longitude": pl.Float64,
+        "image": pl.Binary,
+    }
+
+    # return the data
+    return pl.DataFrame(data, schema)
+
+
+def extract_data_shard2db(shard: Path) -> pl.DataFrame:
+    """Extract the data from a shard.
+
+    Args:
+        shard (Path): path to the shard
+
+    Returns:
+        pl.DataFrame: data from the shard
+    """
+
+    # define lists to store the data
+    lats = []
+    lons = []
+    ims = []
+
+    # read the shard
+    with open(shard, "rb") as infile:
+        for record in msgpack.Unpacker(infile, raw=False):
+            lats.append(record["latitude"])
+            lons.append(record["longitude"])
+            ims.append(record["image"])
+
+    # Define dataframe
+    data = {
+        "latitude": lats,
+        "longitude": lons,
+        "image": ims,
+    }
+    schema = {
         "latitude": pl.Float64,
         "longitude": pl.Float64,
         "image": pl.Binary,
@@ -182,8 +220,14 @@ def regenerate_description(dst_dir: str | Path = PROCESSED_DATA_DIR / "LDoGI"):
 
 def process_raw_data(
     src_dir: str | Path = RAW_DATA_DIR / "LDoGI/shards",
-    dst_dir: str | Path = PROCESSED_DATA_DIR / "LDoGI",
+    strategy: str = "db",  # "shard" | "db"
     *,
+    dst_dir: str | Path = PROCESSED_DATA_DIR / "LDoGI",
+    db_host: str = "localhost",
+    db_port: int = 5432,
+    db_name: str = "database",
+    db_user: str = "username",
+    db_password: str = "password",
     verbose: bool = True,
     delete_existing: bool = False,
     filter_files: Callable[[str | Path], bool] | None = None,
@@ -213,21 +257,31 @@ def process_raw_data(
     if not src_dir.is_dir():
         raise FileNotFoundError(f"src_dir not found: {src_dir}")
 
-    # check if dst dir exists, create if not
-    if not shard_dir.is_dir():
-        shard_dir.mkdir(parents=True)
+    if strategy == "shard":
+        # check if dst dir is defined
+        if not dst_dir:
+            raise ValueError("dst_dir must be defined if strategy is 'shard'")
 
-    # delete existing files if requested
-    if delete_existing:
-        delete_processed_data(shard_dir, verbose=verbose)
+        # check if dst dir exists, create if not
+        if not shard_dir.is_dir():
+            shard_dir.mkdir(parents=True)
 
-    # check if dst dir is empty
-    dst_dir_files = len(list(shard_dir.glob("*.parquet"))) > 0
-    if dst_dir_files > 0:
-        raise FileExistsError(
-            f"dst_dir is not empty, found {dst_dir_files} files. If you want to overwrite them,\
-                  set delete_existing=True"
-        )
+        # delete existing files if requested
+        if delete_existing:
+            delete_processed_data(shard_dir, verbose=verbose)
+
+        # check if dst dir is empty
+        dst_dir_files = len(list(shard_dir.glob("*.parquet"))) > 0
+        if dst_dir_files > 0:
+            raise FileExistsError(
+                f"dst_dir is not empty, found {dst_dir_files} files. If you want to overwrite them,\
+                    set delete_existing=True"
+            )
+
+    if strategy == "db":
+        # check if db parameters are defined
+        if not all([db_host, db_port, db_name, db_user, db_password]):
+            raise ValueError("db_host, db_port, db_name, db_user, db_password must be defined if strategy is 'db'")
 
     msgpack_files_glob = src_dir.glob("*.msg")
     msgpack_files_filter = filter(filter_files, msgpack_files_glob) if filter_files else msgpack_files_glob
@@ -247,42 +301,67 @@ def process_raw_data(
         # get the name of the file
         file_name = msgpack_file.stem
 
-        # read the msgpack file
-        data = extract_from_shard(msgpack_file, first_id=first_id)
+        if strategy == "shard":
+            # read the msgpack file
+            data = extract_data_shard2shard(msgpack_file, first_id=first_id)
+            # update first_id
+            first_id += data.shape[0]
 
-        # update first_id
-        first_id += data.shape[0]
+            # define the parquet file
+            parquet_file = shard_dir / f"{file_name}.parquet"
 
-        # define the parquet file
-        parquet_file = shard_dir / f"{file_name}.parquet"
+            # save the data as a parquet file
+            data.write_parquet(parquet_file)
 
-        # save the data as a parquet file
-        data.write_parquet(parquet_file)
+            # some accounting
+            dst_sum_size += os.path.getsize(parquet_file)
+
+            # update the describe data
+            describe_data = update_describe_data(describe_data, file_name, data.shape[0])
+
+        if strategy == "db":
+            # read the msgpack file
+            data = extract_data_shard2db(msgpack_file)
+
+            # write the data to the database
+            data.write_database(
+                "dataset",
+                f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}",
+                if_table_exists="append",
+            )
 
         # some accounting
         file_count += 1
         src_sum_size += os.path.getsize(msgpack_file)
-        dst_sum_size += os.path.getsize(parquet_file)
-
-        # update the describe data
-        describe_data = update_describe_data(describe_data, file_name, data.shape[0])
-
-    if describe:
+    if strategy == "shard" and describe:
         write_description(describe_data, dst_dir=desc_dir)
 
     # print some stats
     if verbose:
         console.print(f"Processed {file_count} files")
         console.print(f"src size: {format_data_size(src_sum_size, precision=3)}")
-        console.print(f"dst size: {format_data_size(dst_sum_size, precision=3)}")
+        if strategy == "shard":
+            console.print(f"dst size: {format_data_size(dst_sum_size, precision=3)}")
 
 
 if __name__ == "__main__":
     # test if process_raw_data works
+    # process_raw_data(
+    #     strategy="shard",
+    #     dst_dir=PROCESSED_DATA_DIR / "LDoGI/test",
+    #     delete_existing=True,
+    #     filter_files=lambda x: Path(x).name in [f"shard_{i}.msg" for i in range(5)],
+    # )
+
     process_raw_data(
-        dst_dir=PROCESSED_DATA_DIR / "LDoGI/test",
+        strategy="db",
+        db_host="localhost",
+        db_port=5432,
+        db_name="ldogi",
+        db_user="postgres",
+        db_password="1425869",
         delete_existing=True,
-        filter_files=lambda x: Path(x).name in [f"shard_{i}.msg" for i in range(5)],
+        filter_files=lambda x: Path(x).name in [f"shard_{i}.msg" for i in range(142)],
     )
 
     # test if process_raw_data throws an error
