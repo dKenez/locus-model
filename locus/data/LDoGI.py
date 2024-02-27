@@ -6,12 +6,13 @@ from typing import Callable
 
 import msgpack
 import polars as pl
+import psycopg2
 from tqdm import tqdm
 
 from locus.utils.console import console
 from locus.utils.formatter import format_data_size
 from locus.utils.interfaces import DescribeJsonStructure
-from locus.utils.paths import PROCESSED_DATA_DIR, RAW_DATA_DIRfor i, (images, labels) in 
+from locus.utils.paths import PROCESSED_DATA_DIR, RAW_DATA_DIR
 
 
 def extract_data_shard2shard(shard: Path, *, first_id) -> pl.DataFrame:
@@ -282,6 +283,17 @@ def process_raw_data(
         # check if db parameters are defined
         if not all([db_host, db_port, db_name, db_user, db_password]):
             raise ValueError("db_host, db_port, db_name, db_user, db_password must be defined if strategy is 'db'")
+
+        conn = psycopg2.connect(
+            host=db_host,
+            port=db_port,
+            dbname=db_name,
+            user=db_user,
+            password=db_password,
+        )
+
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM dataset")
 
     msgpack_files_glob = src_dir.glob("*.msg")
     msgpack_files_filter = filter(filter_files, msgpack_files_glob) if filter_files else msgpack_files_glob

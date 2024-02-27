@@ -1,5 +1,6 @@
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 import networkx as nx
 import polars as pl
@@ -264,7 +265,7 @@ class QuadTree(nx.DiGraph):
         """
         return CellState.EVALUATING in [node["state"] for node in self.nodes.values()]
 
-    def get_nodes(self, state: CellState) -> list[str]:
+    def get_nodes(self, state: CellState) -> list[dict[str, Any]]:
         """Get all nodes in the graph with a given state.
 
         Args:

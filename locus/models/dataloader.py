@@ -1,6 +1,7 @@
 import networkx as nx
-from torch.utils.data import BatchSampler, DataLoader, RandomSampler
 import torch
+from torch.utils.data import DataLoader
+
 from locus.data.QuadTree import CellState
 from locus.models.dataset import LDoGIDataset
 from locus.utils.paths import PROCESSED_DATA_DIR

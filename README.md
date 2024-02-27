@@ -65,16 +65,10 @@ run database
 docker run --name locus-db -p 5432:5432 --network=db -v "$PWD:/var/lib/postgresql/data" -e POSTGRES_PASSWORD={YOUR_PASSWORD} -d postgres
 ```
 
-
-
-
-
-
-
-
 ## Project structure
 
 The project structure can be seen in the [structure.md](/docs/markdown/structure.md) file.
 
+```
 
 ```
