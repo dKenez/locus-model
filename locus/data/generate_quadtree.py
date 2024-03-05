@@ -14,7 +14,7 @@ from rich.live import Live
 from rich.table import Table
 
 from locus.data.QuadTree import CellState, QuadTree
-from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR
+from locus.utils.paths import PROCESSED_DATA_DIR
 
 
 def setup_table():

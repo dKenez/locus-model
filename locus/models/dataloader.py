@@ -1,11 +1,7 @@
-import networkx as nx
 import torch
 from torch.utils.data import DataLoader
 
-from locus.data.QuadTree import CellState
 from locus.models.dataset import LDoGIDataset
-from locus.utils.paths import PROCESSED_DATA_DIR
-
 
 train_data = LDoGIDataset("quadtree.gml", from_id=1, to_id=1_000)
 test_data = LDoGIDataset("quadtree.gml", from_id=1_001, to_id=2_000)
