@@ -6,7 +6,6 @@ from typing import Callable
 
 import msgpack
 import polars as pl
-import psycopg2
 from tqdm import tqdm
 
 from locus.utils.console import console
@@ -225,7 +224,7 @@ def process_raw_data(
     *,
     dst_dir: str | Path = PROCESSED_DATA_DIR / "LDoGI",
     db_host: str = "localhost",
-    db_port: int = 5432,
+    db_port: str | int = 5432,
     db_name: str = "database",
     db_user: str = "username",
     db_password: str = "password",
@@ -283,17 +282,6 @@ def process_raw_data(
         # check if db parameters are defined
         if not all([db_host, db_port, db_name, db_user, db_password]):
             raise ValueError("db_host, db_port, db_name, db_user, db_password must be defined if strategy is 'db'")
-
-        conn = psycopg2.connect(
-            host=db_host,
-            port=db_port,
-            dbname=db_name,
-            user=db_user,
-            password=db_password,
-        )
-
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM dataset")
 
     msgpack_files_glob = src_dir.glob("*.msg")
     msgpack_files_filter = filter(filter_files, msgpack_files_glob) if filter_files else msgpack_files_glob

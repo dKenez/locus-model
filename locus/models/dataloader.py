@@ -6,11 +6,9 @@ from locus.data.QuadTree import CellState
 from locus.models.dataset import LDoGIDataset
 from locus.utils.paths import PROCESSED_DATA_DIR
 
-G = nx.read_gml(PROCESSED_DATA_DIR / "LDoGI/quadtrees/qt.gml")
-active_cells = [node for node in list(G.nodes) if G.nodes[node]["state"] == CellState.ACTIVE.value]
 
-train_data = LDoGIDataset(active_cells, from_id=1, to_id=1_000)
-test_data = LDoGIDataset(active_cells, from_id=1_001, to_id=2_000)
+train_data = LDoGIDataset("quadtree.gml", from_id=1, to_id=1_000)
+test_data = LDoGIDataset("quadtree.gml", from_id=1_001, to_id=2_000)
 
 
 def cf(*args, **kwargs):

@@ -4,6 +4,9 @@ from typing import Any
 
 import networkx as nx
 import polars as pl
+from psycopg2._psycopg import connection
+
+from locus.utils.paths import SQL_DIR
 
 
 class CellState(Enum):
@@ -197,6 +200,12 @@ class QuadTree(nx.DiGraph):
 
         self.excluded_ids = []
 
+        with open(SQL_DIR / "select_count_lat_lon.sql", "r") as f:
+            self.count_sql_string = f.read()
+
+        with open(SQL_DIR / "select_ids_lat_lon.sql", "r") as f:
+            self.ids_sql_string = f.read()
+
     def expand(self):
         """Expand the quadtree by subdividing all cells in the evaluating state into 4 new cells."""
 
@@ -214,7 +223,7 @@ class QuadTree(nx.DiGraph):
                     self.add_node(f"{node_id}{i}", state=CellState.EVALUATING)
                     self.add_edge(node_id, f"{node_id}{i}")
 
-    def evaluate_cells(self, df: pl.LazyFrame, min_count: int, max_count: int):
+    def evaluate_cells(self, conn: connection, min_count: int, max_count: int):
         """Evaluate the cells in the graph to determine if they should be subdivided, stopped, or classed as active.
 
         - Cells with a number of data points less than min_count will be stopped.
@@ -236,14 +245,9 @@ class QuadTree(nx.DiGraph):
 
             # Get the bounds of the cell and filter the dataframe to only include points within the cell
             south_lat, north_lat, west_lon, east_lon = cell_bounds(node_id)
-            filtered_df = df.filter(
-                (pl.col("latitude") > south_lat)
-                & (pl.col("latitude") < north_lat)
-                & (pl.col("longitude") > west_lon)
-                & (pl.col("longitude") < east_lon)
-            )
 
-            count_in_cell = filtered_df.count().collect()["latitude"][0]
+            sql_string = self.count_sql_string.format(south_lat, north_lat, west_lon, east_lon)
+            count_in_cell = pl.read_database(sql_string, conn)["count"][0]
 
             # If the number of data points in the cell is less than min_count, stop the cell
             # If the number of data points in the cell is between min_count and max_count, make the cell active
@@ -254,7 +258,8 @@ class QuadTree(nx.DiGraph):
             else:
                 node["state"] = CellState.STOPPED
 
-                ids = filtered_df.collect()["id"].to_list()
+                sql_string = self.ids_sql_string.format(south_lat, north_lat, west_lon, east_lon)
+                ids = pl.read_database(sql_string, conn)["id"].to_list()
                 self.excluded_ids.extend(ids)
 
     def is_evaluating(self):

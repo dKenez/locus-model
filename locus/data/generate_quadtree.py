@@ -1,18 +1,20 @@
 import json
 import threading
 import time
-from pathlib import Path
 
 import click
 import networkx as nx
 import polars as pl
+import psycopg2
+from dotenv import dotenv_values
+from psycopg2._psycopg import connection
 from rich import box
 from rich.align import Align
 from rich.live import Live
 from rich.table import Table
 
 from locus.data.QuadTree import CellState, QuadTree
-from locus.utils.paths import PROCESSED_DATA_DIR
+from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR
 
 
 def setup_table():
@@ -92,7 +94,7 @@ def update_table(tree: QuadTree, table: Table, prev_evaluating: int, total_data_
     return curr_evaluating
 
 
-def partition_quadtree(tree: QuadTree, df: pl.LazyFrame, tau_min: int, tau_max: int):
+def partition_quadtree(tree: QuadTree, conn: connection, tau_min: int, tau_max: int):
     """Partition the dataframe using a quadtree algorithm
 
     Args:
@@ -110,7 +112,8 @@ def partition_quadtree(tree: QuadTree, df: pl.LazyFrame, tau_min: int, tau_max: 
     start_time_thread.daemon = True
     start_time_thread.start()
 
-    total_data_points = df.count().collect()["latitude"][0]
+    sql_string = tree.count_sql_string.format(-90, 90, -180, 180)
+    total_data_points = pl.read_database(sql_string, conn)["count"][0]
 
     prev_evaluating = 0
     with Live(table_centered, refresh_per_second=4):  # update 4 times a second to feel fluid
@@ -119,7 +122,7 @@ def partition_quadtree(tree: QuadTree, df: pl.LazyFrame, tau_min: int, tau_max: 
             prev_evaluating = update_table(tree, table, prev_evaluating, total_data_points)
 
             tree.expand()
-            tree.evaluate_cells(df, tau_min, tau_max)
+            tree.evaluate_cells(conn, tau_min, tau_max)
 
         # update_time(start_time, table)
         update_table(tree, table, prev_evaluating, total_data_points)
@@ -131,11 +134,10 @@ def partition_quadtree(tree: QuadTree, df: pl.LazyFrame, tau_min: int, tau_max: 
 
 
 @click.command()
-@click.argument("shards", required=False, nargs=-1)
 @click.option("--tau-min", default=50, help="Minimum number of data points in a cell.")
 @click.option("--tau-max", default=2000, help="Maximum number of data points in a cell.")
 @click.option("--output", default="quadtree.gml", help="Output file for saving the QuadTree.")
-def main(shards: tuple[str], tau_min: int, tau_max: int, output: str):
+def main(tau_min: int, tau_max: int, output: str):
     """Generate a quadtree from a dataset of image locations.
 
     Args:
@@ -161,23 +163,23 @@ def main(shards: tuple[str], tau_min: int, tau_max: int, output: str):
         with open(manifest_file, "w") as f:
             f.write('{"quadtrees": []}')
 
-    shard_files: Path | list[Path]
-    if len(shards) == 0:
-        shard_files = PROCESSED_DATA_DIR / "LDoGI/shards/shard_*.parquet"
-    else:
-        if "all" in shards:
-            shard_files = PROCESSED_DATA_DIR / "LDoGI/shards/shard_*.parquet"
-        else:
-            shard_files = [PROCESSED_DATA_DIR / f"LDoGI/shards/shard_{shard}.parquet" for shard in shards]
+    config = dotenv_values(".env")
 
-    df = pl.scan_parquet(shard_files)
-    df = df.drop("image")
+    conn = psycopg2.connect(
+        host=config["DB_HOST"] or "",
+        port=config["DB_PORT"] or 0,
+        dbname=config["DB_NAME"] or "",
+        user=config["DB_USER"] or "",
+        password=(config["DB_PASSWORD"] or ""),
+    )
 
     g = QuadTree()
-    partition_quadtree(g, df, tau_min, tau_max)
+    partition_quadtree(g, conn, tau_min, tau_max)
+
+    conn.close()
 
     output_path = quadtrees_dir / output
-    g.write_gml(f"{output_path}.gml")
+    g.write_gml(output_path)
 
     # read the manifest.json file
     with open(manifest_file, "r") as f:
@@ -190,7 +192,6 @@ def main(shards: tuple[str], tau_min: int, tau_max: int, output: str):
             "params": {
                 "tau_min": tau_min,
                 "tau_max": tau_max,
-                "shards": [int(shard) for shard in shards],
             },
             "excluded_ids": sorted(g.excluded_ids),
         }
