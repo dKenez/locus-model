@@ -1,4 +1,7 @@
 import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision.models import ResNet50_Weights, resnet50
 
 
 class MyNeuralNet(torch.nn.Module):
@@ -10,10 +13,11 @@ class MyNeuralNet(torch.nn.Module):
 
     """
 
-    def __init__(self, in_features: int, out_features: int) -> None:
-        self.l1 = torch.nn.Linear(in_features, 500)
-        self.l2 = torch.nn.Linear(500, out_features)
-        self.r = torch.nn.ReLU()
+    def __init__(self, classes: int) -> None:
+        self.model = resnet50(pretrained=True, weights=ResNet50_Weights.IMAGENET1K_V2)
+
+        num_features = self.model.fc.in_features
+        self.model.fc = nn.Linear(num_features, classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass of the model.

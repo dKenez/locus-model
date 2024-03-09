@@ -1,0 +1,155 @@
+import networkx as nx
+import psycopg2
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from dotenv import dotenv_values
+from torch.utils.data import DataLoader
+from torchvision.models import ResNet50_Weights, resnet50
+
+from locus.data.QuadTree import CellState
+from locus.models.dataset import LDoGIDataset
+from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR
+
+config = dotenv_values()
+
+conn = psycopg2.connect(
+    host=config["DB_HOST"],
+    port=config["DB_PORT"],
+    dbname=config["DB_NAME"],
+    user=config["DB_USER"],
+    password=config["DB_PASSWORD"],
+)
+cur = conn.cursor()
+
+with open(SQL_DIR / "select_max_id.sql", "r") as f:
+    sql_string = f.read()
+cur.execute(sql_string)
+records = cur.fetchall()
+max_id = records[0][0] // 6_000
+
+# close the connection and cursor
+cur.close()
+conn.close()
+
+# train test val - 70-20-10 split
+from_id_train = 1
+to_id_train = int(max_id * 0.7)
+
+from_id_test = to_id_train + 1
+to_id_test = from_id_test + int(max_id * 0.2)
+
+from_id_val = to_id_test + 1
+to_id_val = max_id
+
+QUADTREE = "qt_50_5000.gml"
+G = nx.read_gml(PROCESSED_DATA_DIR / f"LDoGI/quadtrees/{QUADTREE}")
+active_cells = [node for node in list(G.nodes) if G.nodes[node]["state"] == CellState.ACTIVE.value]
+num_classes = len(active_cells)
+# Load the data
+train_data = LDoGIDataset(quadtree=QUADTREE, from_id=from_id_train, to_id=to_id_train)
+test_data = LDoGIDataset(quadtree=QUADTREE, from_id=from_id_test, to_id=to_id_test)
+
+
+def cf_factory(num_classes: int):
+    def cf(*args, **kwargs):
+        ids = [i[0] for i in args[0]]
+        image_tensors = [i[1] for i in args[0]]
+        labels_list = [i[2][0] for i in args[0]]
+        labels = torch.zeros((len(labels_list), num_classes), dtype=torch.float32)
+        for i, label in enumerate(labels_list):
+            labels[i][active_cells.index(label)] = 1
+        images = torch.cat(image_tensors, dim=0)
+        return ids, images, labels
+
+    return cf
+
+
+# Define the dataloaders
+train_loader = DataLoader(
+    train_data,
+    collate_fn=cf_factory(num_classes),
+    shuffle=True,
+    batch_size=32,
+    num_workers=1,
+    prefetch_factor=2,
+)
+
+test_loader = DataLoader(
+    test_data,
+    collate_fn=cf_factory(num_classes),
+    shuffle=True,
+    batch_size=32,
+    num_workers=1,
+    prefetch_factor=2,
+)
+
+# Define the model
+model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
+
+
+# Replace the last layer
+num_features = model.fc.in_features
+model.fc = nn.Linear(num_features, num_classes)
+
+# Define the loss function and optimizer
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+
+# Move the model to the device
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
+
+
+# Define the number of epochs
+num_epochs = 10
+
+# Train the model
+for epoch in range(num_epochs):
+    # Train the model on the training set
+    model.train()
+    train_loss = 0.0
+    for i, (ids, inputs, labels) in enumerate(train_loader):
+        print(i)
+        # Move the data to the device
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        # Zero the parameter gradients
+        optimizer.zero_grad()
+
+        # Forward + backward + optimize
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        # Update the training loss
+        train_loss += loss.item() * inputs.size(0)
+
+    # Evaluate the model on the test set
+    model.eval()
+    test_loss = 0.0
+    test_acc = 0.0
+    with torch.no_grad():
+        for i, (inputs, labels) in enumerate(test_loader):
+            # Move the data to the device
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
+            # Forward
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+
+            # Update the test loss and accuracy
+            test_loss += loss.item() * inputs.size(0)
+            _, preds = torch.max(outputs, 1)
+            test_acc += torch.sum(preds == labels.data)
+
+    # Print the training and test loss and accuracy
+    train_loss /= len(train_data)
+    test_loss /= len(test_data)
+    test_acc = test_acc.double() / len(test_data)
+    print(
+        f"Epoch [{epoch + 1}/{num_epochs}] Train Loss: {train_loss:.4f} Test Loss: {test_loss:.4f} Test Acc: {test_acc:.4f}"  # noqa: E501
+    )

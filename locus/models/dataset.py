@@ -47,16 +47,19 @@ class LDoGIDataset(Dataset):
             excl_id for excl_id in quadtree_info["excluded_ids"] if excl_id >= from_id and excl_id <= to_id
         ]
 
+        self.excluded_ids = self.excluded_ids or [-1]
+
         self.active_cells = active_cells
         self.transforms = v2.Compose(
             [
                 v2.ToImage(),  # Convert to tensor, only needed if you had a PIL image
-                v2.ToDtype(torch.uint8, scale=True),  # optional, most input are already uint8 at this point
                 # ...
-                v2.RandomResizedCrop(size=(360, 360), antialias=True),  # Or Resize(antialias=True)
+                v2.ToDtype(torch.float32, scale=True),  # Normalize expects float input
+                v2.Resize(224, antialias=True),
+                v2.RandomCrop(size=(224)),  # Or Resize(antialias=True)
                 # ...
-                # v2.ToDtype(torch.float32, scale=True),  # Normalize expects float input
-                # v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                # v2.ToDtype(torch.uint8, scale=True),
             ]
         )
 
