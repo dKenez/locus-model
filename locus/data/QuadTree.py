@@ -5,6 +5,7 @@ from typing import Any
 import networkx as nx
 import polars as pl
 from psycopg2._psycopg import connection
+import torch
 
 from locus.utils.paths import SQL_DIR
 
@@ -122,7 +123,7 @@ def calc_enclosing_cell(lat: float, lon: float, active_cells: list[str]):
 
         # Determine the horizontal half of the cell that the point is in
         half_lon = (west_lon + east_lon) / 2
-        if lon > half_lon:
+        if lon >= half_lon:
             quad += 1
             ret_west_lon = half_lon
         else:
@@ -131,10 +132,10 @@ def calc_enclosing_cell(lat: float, lon: float, active_cells: list[str]):
         return quad, (ret_south_lat, ret_north_lat, ret_west_lon, ret_east_lon)
 
     # Initialize bounds to the entire world
-    south_lat = -90
-    north_lat = 90
-    west_lon = -180
-    east_lon = 180
+    west_lon = torch.tensor(-180, dtype=torch.float32)
+    east_lon = torch.tensor(180, dtype=torch.float32)
+    south_lat = torch.tensor(-90, dtype=torch.float32)
+    north_lat = torch.tensor(90, dtype=torch.float32)
 
     cell = ""
     cell_pool = [c for c in active_cells]  # Make a copy of the active cells

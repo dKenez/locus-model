@@ -26,7 +26,7 @@ with open(SQL_DIR / "select_max_id.sql", "r") as f:
     sql_string = f.read()
 cur.execute(sql_string)
 records = cur.fetchall()
-max_id = records[0][0] // 6_000
+max_id = records[0][0]
 
 # close the connection and cursor
 cur.close()
@@ -58,6 +58,9 @@ def cf_factory(num_classes: int):
         labels_list = [i[2][0] for i in args[0]]
         labels = torch.zeros((len(labels_list), num_classes), dtype=torch.float32)
         for i, label in enumerate(labels_list):
+            if label is None:
+                print(f"None label at index {i}")
+                print(f"ids: {ids[i]}")
             labels[i][active_cells.index(label)] = 1
         images = torch.cat(image_tensors, dim=0)
         return ids, images, labels
@@ -85,7 +88,7 @@ test_loader = DataLoader(
 )
 
 # Define the model
-model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
+model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
 
 
 # Replace the last layer
@@ -102,7 +105,10 @@ model = model.to(device)
 
 
 # Define the number of epochs
-num_epochs = 10
+num_epochs = 30
+
+print(f"training set length:{len(train_data)}")
+print(f"batches:{len(train_data)//32}")
 
 # Train the model
 for epoch in range(num_epochs):
@@ -110,7 +116,8 @@ for epoch in range(num_epochs):
     model.train()
     train_loss = 0.0
     for i, (ids, inputs, labels) in enumerate(train_loader):
-        print(i)
+        if (i + 1) % 100 == 0:
+            print(f"batch {i+1}/{len(train_data)//32}")
         # Move the data to the device
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -132,7 +139,7 @@ for epoch in range(num_epochs):
     test_loss = 0.0
     test_acc = 0.0
     with torch.no_grad():
-        for i, (inputs, labels) in enumerate(test_loader):
+        for i, (ids, inputs, labels) in enumerate(test_loader):
             # Move the data to the device
             inputs = inputs.to(device)
             labels = labels.to(device)
@@ -144,7 +151,9 @@ for epoch in range(num_epochs):
             # Update the test loss and accuracy
             test_loss += loss.item() * inputs.size(0)
             _, preds = torch.max(outputs, 1)
-            test_acc += torch.sum(preds == labels.data)
+            _, ground_truth = torch.max(labels, 1)
+
+            test_acc += torch.sum(preds == ground_truth)
 
     # Print the training and test loss and accuracy
     train_loss /= len(train_data)
