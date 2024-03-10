@@ -1,3 +1,4 @@
+from datetime import datetime
 import networkx as nx
 import psycopg2
 import torch
@@ -9,10 +10,10 @@ from torchvision.models import ResNet50_Weights, resnet50
 
 from locus.data.QuadTree import CellState
 from locus.models.dataset import LDoGIDataset
-from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR
+from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR, WEIGHTS_DIR
 
 config = dotenv_values()
-
+current_datetime = datetime.now()
 conn = psycopg2.connect(
     host=config["DB_HOST"],
     port=config["DB_PORT"],
@@ -26,7 +27,7 @@ with open(SQL_DIR / "select_max_id.sql", "r") as f:
     sql_string = f.read()
 cur.execute(sql_string)
 records = cur.fetchall()
-max_id = records[0][0]
+max_id = records[0][0]//10000
 
 # close the connection and cursor
 cur.close()
@@ -105,7 +106,7 @@ model = model.to(device)
 
 
 # Define the number of epochs
-num_epochs = 30
+num_epochs = 10
 
 print(f"training set length:{len(train_data)}")
 print(f"batches:{len(train_data)//32}")
@@ -162,3 +163,12 @@ for epoch in range(num_epochs):
     print(
         f"Epoch [{epoch + 1}/{num_epochs}] Train Loss: {train_loss:.4f} Test Loss: {test_loss:.4f} Test Acc: {test_acc:.4f}"  # noqa: E501
     )
+
+
+date_string = current_datetime.strftime("%Y-%m-%d")
+time_string = current_datetime.strftime("%H-%M-%S")
+# Specify the file path where you want to save the weights
+weights_path = WEIGHTS_DIR / f'test_weights_{date_string}_{time_string}.pth'
+
+# Alternatively, save only the model's state_dict
+torch.save(model.state_dict(), weights_path)

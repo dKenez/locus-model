@@ -3,6 +3,9 @@ docs/site/
 # data
 /data/
 
+# models
+/models/*.pth
+
 # test cache
 manual_test/
 
