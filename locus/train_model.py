@@ -1,6 +1,4 @@
-import logging
 from datetime import datetime
-
 import networkx as nx
 import psycopg2
 import torch
@@ -14,36 +12,8 @@ from locus.data.QuadTree import CellState
 from locus.models.dataset import LDoGIDataset
 from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR, WEIGHTS_DIR
 
-current_datetime = datetime.now()
-date_string = current_datetime.strftime("%Y-%m-%d")
-time_string = current_datetime.strftime("%H-%M-%S")
-# Specify the file path where you want to save the weights
-weights_path = WEIGHTS_DIR / f"test_weights_{date_string}_{time_string}.pth"
-log_path = WEIGHTS_DIR / f"test_log_{date_string}_{time_string}.log"
-
-# Set the logging configuration
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s", handlers=[])
-
-# Create a file handler and set the file name
-file_handler = logging.FileHandler(log_path)
-file_handler.setLevel(logging.DEBUG)  # You can set the level for the file handler independently
-
-# Create a console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)  # Set the level for the console handler independently
-
-# Create a formatter and add it to the handlers
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-
-# Create a logger and add the handlers
-logger = logging.getLogger()
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
-
 config = dotenv_values()
-
+current_datetime = datetime.now()
 conn = psycopg2.connect(
     host=config["DB_HOST"],
     port=config["DB_PORT"],
@@ -57,7 +27,7 @@ with open(SQL_DIR / "select_max_id.sql", "r") as f:
     sql_string = f.read()
 cur.execute(sql_string)
 records = cur.fetchall()
-max_id = records[0][0] // 10000
+max_id = records[0][0]//10000
 
 # close the connection and cursor
 cur.close()
@@ -90,8 +60,8 @@ def cf_factory(num_classes: int):
         labels = torch.zeros((len(labels_list), num_classes), dtype=torch.float32)
         for i, label in enumerate(labels_list):
             if label is None:
-                logger.critical(f"None label at index {i}")
-                logger.critical(f"ids: {ids[i]}")
+                print(f"None label at index {i}")
+                print(f"ids: {ids[i]}")
             labels[i][active_cells.index(label)] = 1
         images = torch.cat(image_tensors, dim=0)
         return ids, images, labels
@@ -136,10 +106,10 @@ model = model.to(device)
 
 
 # Define the number of epochs
-num_epochs = 30
+num_epochs = 10
 
-logger.info(f"training set length:{len(train_data)}")
-logger.info(f"batches:{len(train_data)//32}")
+print(f"training set length:{len(train_data)}")
+print(f"batches:{len(train_data)//32}")
 
 # Train the model
 for epoch in range(num_epochs):
@@ -148,7 +118,7 @@ for epoch in range(num_epochs):
     train_loss = 0.0
     for i, (ids, inputs, labels) in enumerate(train_loader):
         if (i + 1) % 100 == 0:
-            logger.info(f"batch {i+1}/{len(train_data)//32}")
+            print(f"batch {i+1}/{len(train_data)//32}")
         # Move the data to the device
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -190,10 +160,15 @@ for epoch in range(num_epochs):
     train_loss /= len(train_data)
     test_loss /= len(test_data)
     test_acc = test_acc.double() / len(test_data)
-    logger.info(
+    print(
         f"Epoch [{epoch + 1}/{num_epochs}] Train Loss: {train_loss:.4f} Test Loss: {test_loss:.4f} Test Acc: {test_acc:.4f}"  # noqa: E501
     )
 
+
+date_string = current_datetime.strftime("%Y-%m-%d")
+time_string = current_datetime.strftime("%H-%M-%S")
+# Specify the file path where you want to save the weights
+weights_path = WEIGHTS_DIR / f'test_weights_{date_string}_{time_string}.pth'
 
 # Alternatively, save only the model's state_dict
 torch.save(model.state_dict(), weights_path)
