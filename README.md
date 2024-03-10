@@ -34,13 +34,41 @@ To preprocess the data, run:
 make data
 ```
 
-## Usage
+## Setup database
 
+install docker
 
+install postgres docker
 
+create network
+
+```bash
+    docker network create db
+```
+
+create postgres container
+
+```bash
+docker run -d --name pgadmin --network=db -p 80:80 -e PGADMIN_DEFAULT_EMAIL={YOUR_USER} -e PGADMIN_DEFAULT_PASSWORD={YOUR_PASSWORD} dpage/pgadmin4
+```
+
+run psql
+
+```bash
+docker run -it --rm --network=db postgres psql -h locus-db -U postgres
+
+```
+
+run database
+
+```bash
+docker run --name locus-db -p 5432:5432 --network=db -v "$PWD:/var/lib/postgresql/data" -e POSTGRES_PASSWORD={YOUR_PASSWORD} -d postgres
+```
 
 ## Project structure
 
 The project structure can be seen in the [structure.md](/docs/markdown/structure.md) file.
 
+```
 
+```

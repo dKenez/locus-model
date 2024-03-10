@@ -26,6 +26,7 @@ requirements:
 .PHONY: dev_requirements
 dev_requirements: requirements
 	$(PYTHON_INTERPRETER) -m pip install .["dev"]
+	$(PYTHON_INTERPRETER) -m mypy --install-types --non-interactive
 
 ## Delete all compiled Python files
 .PHONY: clean

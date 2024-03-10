@@ -10,6 +10,9 @@ ruff >= 0.1.3
 # requirements
 pipreqs >= 0.4.13
 
+# static type checking
+mypy >= 1.8.0
+
 # docs
 mkdocs <= 1.5.3
 mkdocs-material <= 9.4.6

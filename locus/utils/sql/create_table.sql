@@ -1,11 +1,8 @@
-create table dataset
-(
-    id        int generated always as identity
-        constraint dataset_pk
-            primary key,
-    latitude  real  not null,
-    longitude real  not null,
-    image     bytea not null
+create table dataset (
+    id int generated always as identity constraint dataset_pk primary key,
+    latitude real not null,
+    longitude real not null,
+    image bytea not null
 );
 
 comment on table dataset is 'Table for storing all the images in the LDoGI dataset formatted for easy access.';
