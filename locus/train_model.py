@@ -133,6 +133,7 @@ optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 # Move the model to the device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
+print(device)
 
 
 # Define the number of epochs
