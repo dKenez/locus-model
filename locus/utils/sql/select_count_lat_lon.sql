@@ -7,3 +7,4 @@ where
     and latitude < {}
     and longitude >= {}
     and longitude < {};
+    and id <= {};

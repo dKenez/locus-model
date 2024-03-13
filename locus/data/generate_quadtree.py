@@ -14,7 +14,7 @@ from rich.live import Live
 from rich.table import Table
 
 from locus.data.QuadTree import CellState, QuadTree
-from locus.utils.paths import PROCESSED_DATA_DIR
+from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR
 
 
 def setup_table():
@@ -94,13 +94,14 @@ def update_table(tree: QuadTree, table: Table, prev_evaluating: int, total_data_
     return curr_evaluating
 
 
-def partition_quadtree(tree: QuadTree, conn: connection, tau_min: int, tau_max: int):
+def partition_quadtree(tree: QuadTree, conn: connection, tau_min: int, tau_max: int, max_id: int):
     """Partition the dataframe using a quadtree algorithm
 
     Args:
         df (pl.LazyFrame): East boundary of the cell.
         tau_min (int): East boundary of the cell.
         tau_max (int): East boundary of the cell.
+        max_id (int): Only generate quadtree on datapoints below this id.
     """
     table, table_centered = setup_table()
 
@@ -122,7 +123,7 @@ def partition_quadtree(tree: QuadTree, conn: connection, tau_min: int, tau_max: 
             prev_evaluating = update_table(tree, table, prev_evaluating, total_data_points)
 
             tree.expand()
-            tree.evaluate_cells(conn, tau_min, tau_max)
+            tree.evaluate_cells(conn, tau_min, tau_max, max_id)
 
         # update_time(start_time, table)
         update_table(tree, table, prev_evaluating, total_data_points)
@@ -136,8 +137,9 @@ def partition_quadtree(tree: QuadTree, conn: connection, tau_min: int, tau_max: 
 @click.command()
 @click.option("--tau-min", default=50, help="Minimum number of data points in a cell.")
 @click.option("--tau-max", default=2000, help="Maximum number of data points in a cell.")
-@click.option("--output", default="quadtree.gml", help="Output file for saving the QuadTree.")
-def main(tau_min: int, tau_max: int, output: str):
+@click.option("--data-fraction", default=0.1, help="Fraction of the data to use.")
+@click.option("--output", help="Output file for saving the QuadTree.")
+def main(tau_min: int, tau_max: int, data_fraction: float, output: str):
     """Generate a quadtree from a dataset of image locations.
 
     Args:
@@ -173,10 +175,19 @@ def main(tau_min: int, tau_max: int, output: str):
         password=(config["DB_PASSWORD"] or ""),
     )
 
+    cur = conn.cursor()
+
+    with open(SQL_DIR / "select_max_id.sql") as f:
+        cur.execute(f.read())
+
+    # Retrieve query results
+    max_id = int(cur.fetchall()[0][0] * data_fraction)
+
     g = QuadTree()
-    partition_quadtree(g, conn, tau_min, tau_max)
+    partition_quadtree(g, conn, tau_min, tau_max, max_id)
 
     conn.close()
+    cur.close()
 
     output_path = quadtrees_dir / output
     g.write_gml(output_path)
@@ -192,6 +203,7 @@ def main(tau_min: int, tau_max: int, output: str):
             "params": {
                 "tau_min": tau_min,
                 "tau_max": tau_max,
+                "max_id": max_id,
             },
             "excluded_ids": sorted(g.excluded_ids),
         }

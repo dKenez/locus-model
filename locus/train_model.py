@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from typing import cast
 
 import networkx as nx
 import psycopg2
@@ -7,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from dotenv import dotenv_values
+from networkx import DiGraph
 from torch.utils.data import DataLoader
 from torchvision.models import ResNet50_Weights, resnet50
 
@@ -81,7 +83,7 @@ from_id_val = to_id_test + 1
 to_id_val = max_id
 
 QUADTREE = hyperparams.quadtree
-G = nx.read_gml(PROCESSED_DATA_DIR / f"LDoGI/quadtrees/{QUADTREE}")
+G = cast(DiGraph, nx.read_gml(PROCESSED_DATA_DIR / f"LDoGI/quadtrees/{QUADTREE}"))
 active_cells = [node for node in list(G.nodes) if G.nodes[node]["state"] == CellState.ACTIVE.value]
 num_classes = len(active_cells)
 # Load the data
@@ -175,8 +177,8 @@ for epoch in range(num_epochs):
 
     # Evaluate the model on the test set
     model.eval()
-    test_loss = 0.0
-    test_acc = 0.0
+    test_loss = torch.tensor(0.0)
+    test_acc = torch.tensor(0.0)
     with torch.no_grad():
         for i, (ids, inputs, labels) in enumerate(test_loader):
             # Move the data to the device

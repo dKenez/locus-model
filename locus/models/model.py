@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
 from torchvision.models import ResNet50_Weights, resnet50
 
 

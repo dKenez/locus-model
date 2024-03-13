@@ -4,8 +4,8 @@ from typing import Any
 
 import networkx as nx
 import polars as pl
-from psycopg2._psycopg import connection
 import torch
+from psycopg2._psycopg import connection
 
 from locus.utils.paths import SQL_DIR
 
@@ -87,7 +87,14 @@ def calc_enclosing_cell(lat: float, lon: float, active_cells: list[str]):
         (str | None): The cell that encloses the point, or None if the point is not enclosed by any cell.
     """
 
-    def get_next_cell(lat: float, lon: float, south_lat: float, north_lat: float, west_lon: float, east_lon: float):
+    def get_next_cell(
+        lat: torch.Tensor,
+        lon: torch.Tensor,
+        south_lat: torch.Tensor,
+        north_lat: torch.Tensor,
+        west_lon: torch.Tensor,
+        east_lon: torch.Tensor,
+    ):
         """Given a point (lon, lat) and the bounds of a cell, return the quadrant of the cell that the point is in,
         and the bounds of the new cell that the point is in.
 
@@ -132,6 +139,9 @@ def calc_enclosing_cell(lat: float, lon: float, active_cells: list[str]):
         return quad, (ret_south_lat, ret_north_lat, ret_west_lon, ret_east_lon)
 
     # Initialize bounds to the entire world
+    point_lat = torch.tensor(lat, dtype=torch.float32)
+    point_lon = torch.tensor(lon, dtype=torch.float32)
+
     west_lon = torch.tensor(-180, dtype=torch.float32)
     east_lon = torch.tensor(180, dtype=torch.float32)
     south_lat = torch.tensor(-90, dtype=torch.float32)
@@ -143,7 +153,7 @@ def calc_enclosing_cell(lat: float, lon: float, active_cells: list[str]):
     # While there are still cells to check...
     while True:
         quad, (south_lat, north_lat, west_lon, east_lon) = get_next_cell(
-            lat, lon, south_lat, north_lat, west_lon, east_lon
+            point_lat, point_lon, south_lat, north_lat, west_lon, east_lon
         )
 
         # Build the cell identifier
@@ -224,7 +234,7 @@ class QuadTree(nx.DiGraph):
                     self.add_node(f"{node_id}{i}", state=CellState.EVALUATING)
                     self.add_edge(node_id, f"{node_id}{i}")
 
-    def evaluate_cells(self, conn: connection, min_count: int, max_count: int):
+    def evaluate_cells(self, conn: connection, min_count: int, max_count: int, max_id: int):
         """Evaluate the cells in the graph to determine if they should be subdivided, stopped, or classed as active.
 
         - Cells with a number of data points less than min_count will be stopped.
@@ -235,6 +245,7 @@ class QuadTree(nx.DiGraph):
             df (pl.LazyFrame): Polars LazyFrame containing the image locations with latitude and longitude columns.
             min_count (int): Threshold for minimum number of data points in a cell.
             max_count (int): Threshold for maximum number of data points in a cell.
+            max_id (int): Upper limit of datapoints to consider.
         """
         # Iterate over nodes in the graph
         for node_id in list(self.nodes):
@@ -247,7 +258,7 @@ class QuadTree(nx.DiGraph):
             # Get the bounds of the cell and filter the dataframe to only include points within the cell
             south_lat, north_lat, west_lon, east_lon = cell_bounds(node_id)
 
-            sql_string = self.count_sql_string.format(south_lat, north_lat, west_lon, east_lon)
+            sql_string = self.count_sql_string.format(south_lat, north_lat, west_lon, east_lon, max_id)
             count_in_cell = pl.read_database(sql_string, conn)["count"][0]
 
             # If the number of data points in the cell is less than min_count, stop the cell

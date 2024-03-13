@@ -42,8 +42,13 @@ select = [
 ]
 
 [tool.mypy]
-exclude = ["build/"]
+exclude = ["build/", "data/"]
 
 [[tool.mypy.overrides]]
-module = ["msgpack", "mpl_toolkits.basemap", "torchvision.transforms"]
+module = [
+    "msgpack",
+    "mpl_toolkits.basemap",
+    "torchvision.transforms",
+    "torchvision.models",
+]
 ignore_missing_imports = true

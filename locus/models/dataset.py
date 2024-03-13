@@ -1,12 +1,13 @@
 import json
 from io import BytesIO
-from typing import Iterable
+from typing import Iterable, cast
 
 import networkx as nx
 import polars as pl
 import psycopg2
 import torch
 from dotenv import dotenv_values
+from networkx import DiGraph
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import v2
@@ -40,7 +41,7 @@ class LDoGIDataset(Dataset):
             if qt["name"] == quadtree:
                 quadtree_info = qt
 
-        G = nx.read_gml(PROCESSED_DATA_DIR / f"LDoGI/quadtrees/{quadtree_info['name']}")
+        G = cast(DiGraph, nx.read_gml(PROCESSED_DATA_DIR / f"LDoGI/quadtrees/{quadtree_info['name']}"))
         active_cells = [node for node in list(G.nodes) if G.nodes[node]["state"] == CellState.ACTIVE.value]
 
         self.excluded_ids = [
