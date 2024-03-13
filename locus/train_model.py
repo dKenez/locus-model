@@ -12,7 +12,14 @@ from torchvision.models import ResNet50_Weights, resnet50
 
 from locus.data.QuadTree import CellState
 from locus.models.dataset import LDoGIDataset
-from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR, WEIGHTS_DIR
+from locus.utils.Hyperparams import Hyperparams
+from locus.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, SQL_DIR, WEIGHTS_DIR
+from locus.utils.seeding import seeding
+
+# Set the seed
+seeding(42)
+
+hyperparams = Hyperparams(PROJECT_ROOT / "train_conf.toml")
 
 current_datetime = datetime.now()
 date_string = current_datetime.strftime("%Y-%m-%d")
@@ -57,7 +64,7 @@ with open(SQL_DIR / "select_max_id.sql", "r") as f:
     sql_string = f.read()
 cur.execute(sql_string)
 records = cur.fetchall()
-max_id = records[0][0] // 10000
+max_id = int(records[0][0] * hyperparams.data_fraction)
 
 # close the connection and cursor
 cur.close()
@@ -73,7 +80,7 @@ to_id_test = from_id_test + int(max_id * 0.2)
 from_id_val = to_id_test + 1
 to_id_val = max_id
 
-QUADTREE = "qt_50_5000.gml"
+QUADTREE = hyperparams.quadtree
 G = nx.read_gml(PROCESSED_DATA_DIR / f"LDoGI/quadtrees/{QUADTREE}")
 active_cells = [node for node in list(G.nodes) if G.nodes[node]["state"] == CellState.ACTIVE.value]
 num_classes = len(active_cells)
@@ -104,7 +111,7 @@ train_loader = DataLoader(
     train_data,
     collate_fn=cf_factory(num_classes),
     shuffle=True,
-    batch_size=32,
+    batch_size=hyperparams.batch_size,
     num_workers=1,
     prefetch_factor=2,
 )
@@ -113,7 +120,7 @@ test_loader = DataLoader(
     test_data,
     collate_fn=cf_factory(num_classes),
     shuffle=True,
-    batch_size=32,
+    batch_size=hyperparams.batch_size,
     num_workers=1,
     prefetch_factor=2,
 )
@@ -137,7 +144,7 @@ print(device)
 
 
 # Define the number of epochs
-num_epochs = 30
+num_epochs = hyperparams.epochs
 
 logger.info(f"training set length:{len(train_data)}")
 logger.info(f"batches:{len(train_data)//32}")
