@@ -15,6 +15,7 @@ from torchvision.models import ResNet50_Weights, resnet50
 from locus.data.QuadTree import CellState
 from locus.models.dataloader import LDoGIDataLoader
 from locus.models.dataset import LDoGIDataset
+from locus.utils.EpochProgress import EpochProgress
 from locus.utils.Hyperparams import Hyperparams
 from locus.utils.paths import MODELS_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, SQL_DIR
 from locus.utils.RunLogger import RunLogger
@@ -144,9 +145,13 @@ for epoch in range(1, num_epochs + 1):
     model.train()
     train_loss = 0.0
 
-    for i, (ids, inputs, labels, label_names) in enumerate(train_loader):
-        if (i + 1) % 100 == 0:
-            logger.info(f"batch {i+1}/{len(train_data)//32}")
+    for ids, inputs, labels, label_names in EpochProgress(
+        train_loader,
+        desc="train",
+        epoch=epoch,
+        colour="blue",
+        file_path=monitoring_dir / "progress.log",
+    ):
         # Move the data to the device
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -171,7 +176,13 @@ for epoch in range(1, num_epochs + 1):
     test_loss = torch.tensor(0.0)
     test_acc = torch.tensor(0.0)
     with torch.no_grad():
-        for i, (ids, inputs, labels, label_names) in enumerate(test_loader):
+        for ids, inputs, labels, label_names in EpochProgress(
+            test_loader,
+            desc="test",
+            epoch=epoch,
+            colour="green",
+            file_path=monitoring_dir / "progress.log",
+        ):
             # Move the data to the device
             inputs = inputs.to(device)
             labels = labels.to(device)
