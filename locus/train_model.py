@@ -151,12 +151,13 @@ stats_schema = {
     "test_loss": pl.Float64,
     "test_acc": pl.Float64,
     "mean_squared_error": pl.Float64,
-    "train_data_fetch_time": pl.Duration,
-    "train_model_time": pl.Duration,
-    "train_time": pl.Duration,
-    "model_save_time": pl.Duration,
-    "test_data_fetch_time": pl.Duration,
-    "test_time": pl.Duration,
+    "train_data_fetch_time": pl.Float64,
+    "train_model_time": pl.Float64,
+    "train_time": pl.Float64,
+    "model_save_time": pl.Float64,
+    "test_data_fetch_time": pl.Float64,
+    "test_model_time": pl.Float64,
+    "test_time": pl.Float64,
 }
 
 stats_df = pl.DataFrame({}, schema=stats_schema)
@@ -164,17 +165,18 @@ for epoch in range(1, num_epochs + 1):
     epoch_stat_dict: EpochStats = {
         "epoch": epoch,
         "epoch_start": datetime.now(),
-        "train_loss": 0.0,
-        "test_loss": 0.0,
-        "test_acc": 0.0,
-        "mean_squared_error": 0.0,
-        "train_data_fetch_time": 0.0,
-        "train_model_time": 0.0,
-        "train_time": 0.0,
-        "model_save_time": 0.0,
-        "test_data_fetch_time": 0.0,
-        "test_model_time": 0.0,
-        "test_time": 0.0,
+        "epoch_end": 0,
+        "train_loss": 0,
+        "test_loss": 0,
+        "test_acc": 0,
+        "mean_squared_error": 0,
+        "train_data_fetch_time": 0,
+        "train_model_time": 0,
+        "train_time": 0,
+        "model_save_time": 0,
+        "test_data_fetch_time": 0,
+        "test_model_time": 0,
+        "test_time": 0,
     }
     epoch_start = time.time()
     train_model_end = epoch_start
@@ -260,6 +262,7 @@ for epoch in range(1, num_epochs + 1):
 
     test_end = time.time()
     epoch_stat_dict["test_time"] = test_end - train_model_end
+    epoch_stat_dict["epoch_end"] = datetime.now()
 
     # Print the training and test loss and accuracy
     epoch_stat_dict["train_loss"] /= len(train_data)

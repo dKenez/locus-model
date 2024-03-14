@@ -84,6 +84,7 @@ class EpochStats(TypedDict):
 
     epoch: int
     epoch_start: datetime.datetime
+    epoch_end: datetime.datetime
     train_loss: float
     test_loss: float
     test_acc: float
