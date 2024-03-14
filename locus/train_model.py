@@ -1,4 +1,5 @@
 import logging
+import shutil
 from datetime import datetime
 from typing import cast
 
@@ -9,13 +10,13 @@ import torch.nn as nn
 import torch.optim as optim
 from dotenv import dotenv_values
 from networkx import DiGraph
-from torch.utils.data import DataLoader
 from torchvision.models import ResNet50_Weights, resnet50
 
 from locus.data.QuadTree import CellState
+from locus.models.dataloader import LDoGIDataLoader
 from locus.models.dataset import LDoGIDataset
 from locus.utils.Hyperparams import Hyperparams
-from locus.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, SQL_DIR, WEIGHTS_DIR
+from locus.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, RUNS_DIR, SQL_DIR
 from locus.utils.seeding import seeding
 
 # Set the seed
@@ -26,9 +27,15 @@ hyperparams = Hyperparams(PROJECT_ROOT / "train_conf.toml")
 current_datetime = datetime.now()
 date_string = current_datetime.strftime("%Y-%m-%d")
 time_string = current_datetime.strftime("%H-%M-%S")
-# Specify the file path where you want to save the weights
-weights_path = WEIGHTS_DIR / f"test_weights_{date_string}_{time_string}.pth"
-log_path = WEIGHTS_DIR / f"test_log_{date_string}_{time_string}.log"
+
+run_dir = RUNS_DIR / f"{date_string}_{time_string}"
+weights_dir = run_dir / "weights"
+
+run_dir.mkdir(parents=True)
+weights_dir.mkdir(parents=True)
+
+shutil.copy(PROJECT_ROOT / "train_conf.toml", run_dir / "train_conf.toml")
+log_path = run_dir / "run.log"
 
 # Set the logging configuration
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s", handlers=[])
@@ -86,45 +93,27 @@ QUADTREE = hyperparams.quadtree
 G = cast(DiGraph, nx.read_gml(PROCESSED_DATA_DIR / f"LDoGI/quadtrees/{QUADTREE}"))
 active_cells = [node for node in list(G.nodes) if G.nodes[node]["state"] == CellState.ACTIVE.value]
 num_classes = len(active_cells)
-# Load the data
+
+# Define datasets
 train_data = LDoGIDataset(quadtree=QUADTREE, from_id=from_id_train, to_id=to_id_train)
 test_data = LDoGIDataset(quadtree=QUADTREE, from_id=from_id_test, to_id=to_id_test)
 
 
-def cf_factory(num_classes: int):
-    def cf(*args, **kwargs):
-        ids = [i[0] for i in args[0]]
-        image_tensors = [i[1] for i in args[0]]
-        labels_list = [i[2][0] for i in args[0]]
-        labels = torch.zeros((len(labels_list), num_classes), dtype=torch.float32)
-        for i, label in enumerate(labels_list):
-            if label is None:
-                logger.critical(f"None label at index {i}")
-                logger.critical(f"ids: {ids[i]}")
-            labels[i][active_cells.index(label)] = 1
-        images = torch.cat(image_tensors, dim=0)
-        return ids, images, labels
-
-    return cf
-
-
-# Define the dataloaders
-train_loader = DataLoader(
+# Define dataloaders
+train_loader = LDoGIDataLoader(
     train_data,
-    collate_fn=cf_factory(num_classes),
     shuffle=True,
     batch_size=hyperparams.batch_size,
     num_workers=1,
-    prefetch_factor=2,
+    prefetch_factor=10,
 )
 
-test_loader = DataLoader(
+test_loader = LDoGIDataLoader(
     test_data,
-    collate_fn=cf_factory(num_classes),
     shuffle=True,
     batch_size=hyperparams.batch_size,
     num_workers=1,
-    prefetch_factor=2,
+    prefetch_factor=10,
 )
 
 # Define the model
@@ -156,7 +145,7 @@ for epoch in range(num_epochs):
     # Train the model on the training set
     model.train()
     train_loss = 0.0
-    for i, (ids, inputs, labels) in enumerate(train_loader):
+    for i, (ids, inputs, labels, label_names) in enumerate(train_loader):
         if (i + 1) % 100 == 0:
             logger.info(f"batch {i+1}/{len(train_data)//32}")
         # Move the data to the device
@@ -175,12 +164,15 @@ for epoch in range(num_epochs):
         # Update the training loss
         train_loss += loss.item() * inputs.size(0)
 
+    # Save the model weights
+    torch.save(model.state_dict(), weights_dir / f"epoch_{epoch+1:03}.pth")
+
     # Evaluate the model on the test set
     model.eval()
     test_loss = torch.tensor(0.0)
     test_acc = torch.tensor(0.0)
     with torch.no_grad():
-        for i, (ids, inputs, labels) in enumerate(test_loader):
+        for i, (ids, inputs, labels, label_names) in enumerate(test_loader):
             # Move the data to the device
             inputs = inputs.to(device)
             labels = labels.to(device)
@@ -203,7 +195,3 @@ for epoch in range(num_epochs):
     logger.info(
         f"Epoch [{epoch + 1}/{num_epochs}] Train Loss: {train_loss:.4f} Test Loss: {test_loss:.4f} Test Acc: {test_acc:.4f}"  # noqa: E501
     )
-
-
-# Alternatively, save only the model's state_dict
-torch.save(model.state_dict(), weights_path)

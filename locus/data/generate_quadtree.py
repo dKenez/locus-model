@@ -113,7 +113,7 @@ def partition_quadtree(tree: QuadTree, conn: connection, tau_min: int, tau_max: 
     start_time_thread.daemon = True
     start_time_thread.start()
 
-    sql_string = tree.count_sql_string.format(-90, 90, -180, 180)
+    sql_string = tree.count_sql_string.format(-90, 90, -180, 180, max_id)
     total_data_points = pl.read_database(sql_string, conn)["count"][0]
 
     prev_evaluating = 0
@@ -204,6 +204,11 @@ def main(tau_min: int, tau_max: int, data_fraction: float, output: str):
                 "tau_min": tau_min,
                 "tau_max": tau_max,
                 "max_id": max_id,
+            },
+            "stats": {
+                "max_depth": nx.dag_longest_path_length(g),
+                "active_cells": len(g.get_nodes(CellState.ACTIVE.value)),
+                "excluded_data_points": len(g.excluded_ids),
             },
             "excluded_ids": sorted(g.excluded_ids),
         }

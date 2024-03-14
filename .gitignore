@@ -4,7 +4,7 @@ docs/site/
 /data/
 
 # models
-/models/*.pth
+/models/runs/
 
 # test cache
 manual_test/

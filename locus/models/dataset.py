@@ -3,6 +3,7 @@ from io import BytesIO
 from typing import Iterable, cast
 
 import networkx as nx
+import numpy as np
 import polars as pl
 import psycopg2
 import torch
@@ -124,10 +125,13 @@ class LDoGIDataset(Dataset):
         insert_string = "({})".format(", ".join((str(i) for i in idx)))
         sql_string = sql_string.format(insert_string)
         results_df = pl.read_database(sql_string, self.conn)
+        # create dictionary of id to index in idx
+        results_df = results_df.with_columns(pl.col("id").map_elements(lambda x: idx.index(x)).alias("order"))
+        results_df = results_df.sort("order")
 
         ids = []
         ims = []
-        labels = []
+        label_names = []
         for row in results_df.iter_rows(named=True):
             ids.append(row["id"])
 
@@ -136,18 +140,40 @@ class LDoGIDataset(Dataset):
             im = self.transforms(im_pil)
             ims.append(im)
 
-            labels.append(calc_enclosing_cell(row["latitude"], row["longitude"], self.active_cells))
+            label_names.append(calc_enclosing_cell(row["latitude"], row["longitude"], self.active_cells))
 
         ims_tensor = torch.stack(ims, dim=0)
 
-        return ids, ims_tensor, labels
+        labels = torch.zeros((len(label_names), len(self.active_cells)), dtype=torch.float32)
+        for i, label in enumerate(label_names):
+            labels[i][self.active_cells.index(label)] = 1
+
+        return np.array(ids), ims_tensor, labels, np.array(label_names)
 
 
 if __name__ == "__main__":
-    dataset = LDoGIDataset("quadtree.gml", from_id=1, to_id=1_000_000)
+    dataset = LDoGIDataset("qt_min50_max2000_df1.gml", from_id=1, to_id=1_000_000)
     fetch_idxs = [i for i in range(20)]
     # fetch_idxs.append(1_200_000)
     results = dataset[fetch_idxs]
-    print(results)
+
+    print(f"ids: {results[0]}")
+    print(f"ids shape: {results[0].shape}")
+    print(f"ids dtype: {results[0].dtype}")
+    print()
+
+    print(f"ims shape: {results[1].shape}")
+    print(f"ims dtype: {results[1].dtype}")
+    print()
+
+    print(f"labels shape: {results[2].shape}")
+    print(f"labels sum: {results[2].sum()}")
+    print(f"labels dtype: {results[2].dtype}")
+    print()
+
+    print(f"labels name: {results[3]}")
+    print(f"labels name shape: {results[3].shape}")
+    print(f"labels name dtype: {results[3].dtype}")
+    print()
+
     print(len(dataset))
-    # print(results)

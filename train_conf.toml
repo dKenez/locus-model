@@ -1,4 +1,4 @@
 batch_size = 32
 epochs = 10
-quadtree = "qt_50_5000.gml"
-data_fraction= 0.1
+quadtree = "qt_min10_max100_df0.1.gml"
+data_fraction= 0.00003

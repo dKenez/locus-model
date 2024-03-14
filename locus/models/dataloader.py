@@ -1,27 +1,49 @@
+from typing import Literal
+
+import numpy as np
 import torch
-from torch.utils.data import DataLoader
-
-from locus.models.dataset import LDoGIDataset
-
-train_data = LDoGIDataset("quadtree.gml", from_id=1, to_id=1_000)
-test_data = LDoGIDataset("quadtree.gml", from_id=1_001, to_id=2_000)
+from torch.utils.data import BatchSampler, DataLoader, RandomSampler, SequentialSampler
 
 
-def cf(*args, **kwargs):
-    ids = [i[0] for i in args[0]]
-    image_tensors = [i[1] for i in args[0]]
-    labels = [i[2] for i in args[0]]
-    images = torch.cat(image_tensors, dim=0)
-    return ids, images, labels
+class LDoGIDataLoader(DataLoader):
+    def __init__(
+        self,
+        dataset,
+        *,
+        batch_size=1,
+        shuffle=True,
+        fetch_mode: Literal["individual", "batched"] = "batched",
+        generator=None,
+        drop_last=False,
+        **kwargs,
+    ):
+        _sampler = RandomSampler(dataset, generator=generator) if shuffle else SequentialSampler(dataset)
 
+        if fetch_mode == "individual":
 
-train_dataloader = DataLoader(
-    train_data,
-    collate_fn=cf,
-    shuffle=True,
-    batch_size=64,
-)
-for i, (ids, images, labels) in enumerate(train_dataloader):
-    print(ids)
-    print(i, images.shape, len(labels))
-    # print(i)
+            def cf(*mini_batches):
+                ids_out = np.concatenate([i[0] for i in mini_batches[0]])
+                images_out = torch.cat([i[1] for i in mini_batches[0]])
+                labels_out = torch.cat([i[2] for i in mini_batches[0]])
+                label_names_out = np.concatenate([i[3] for i in mini_batches[0]])
+
+                return ids_out, images_out, labels_out, label_names_out
+
+            super(LDoGIDataLoader, self).__init__(
+                dataset=dataset, batch_size=batch_size, sampler=_sampler, collate_fn=cf, **kwargs
+            )
+
+        elif fetch_mode == "batched":
+
+            def cf(*mini_batches):
+                return mini_batches[0][0]
+
+            super(LDoGIDataLoader, self).__init__(
+                dataset=dataset,
+                sampler=BatchSampler(_sampler, batch_size=batch_size, drop_last=drop_last),
+                collate_fn=cf,
+                **kwargs,
+            )
+
+        else:
+            raise ValueError(f"Fetch mode {fetch_mode} not recognized")
