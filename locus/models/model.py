@@ -16,7 +16,7 @@ class LDoGIResnet(torch.nn.Module):
         super(LDoGIResnet, self).__init__()
 
         # Load pretrained ResNet50 model
-        self.resnet = resnet50(pretrained=True, weights=ResNet50_Weights.IMAGENET1K_V2)
+        self.resnet = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
 
         # Modify the fully connected layer for the number of classes
         num_features = self.resnet.fc.in_features

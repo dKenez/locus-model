@@ -10,7 +10,6 @@ import torch.nn as nn
 import torch.optim as optim
 from dotenv import dotenv_values
 from networkx import DiGraph
-from torchvision.models import ResNet50_Weights, resnet50
 
 from locus.data.QuadTree import CellState
 from locus.models.dataloader import LDoGIDataLoader
