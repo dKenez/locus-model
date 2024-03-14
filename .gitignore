@@ -1,5 +1,8 @@
 docs/site/
 
+# train conf
+train_conf.toml
+
 # data
 /data/
 
