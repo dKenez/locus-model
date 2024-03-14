@@ -1,4 +1,3 @@
-import shutil
 import time
 from datetime import datetime
 from typing import cast
@@ -19,6 +18,7 @@ from locus.models.model import LDoGIResnet
 from locus.utils.cell_utils import CellState, distance_to_cell_bounds
 from locus.utils.EpochProgress import EpochProgress
 from locus.utils.Hyperparams import Hyperparams
+from locus.utils.interfaces import EpochStats
 from locus.utils.justify_table import justify_table
 from locus.utils.paths import MODELS_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, SQL_DIR
 from locus.utils.RunLogger import RunLogger
@@ -161,7 +161,7 @@ stats_schema = {
 
 stats_df = pl.DataFrame({}, schema=stats_schema)
 for epoch in range(1, num_epochs + 1):
-    epoch_stat_dict = {
+    epoch_stat_dict: EpochStats = {
         "epoch": epoch,
         "epoch_start": datetime.now(),
         "train_loss": 0.0,
@@ -173,6 +173,7 @@ for epoch in range(1, num_epochs + 1):
         "train_time": 0.0,
         "model_save_time": 0.0,
         "test_data_fetch_time": 0.0,
+        "test_model_time": 0.0,
         "test_time": 0.0,
     }
     epoch_start = time.time()
@@ -189,7 +190,7 @@ for epoch in range(1, num_epochs + 1):
         file_path=monitoring_dir / "progress.log",
     ):
         data_fetch_end = time.time()
-        epoch_stat_dict["train_data_fetch_time"] += data_fetch_end - train_model_end
+        epoch_stat_dict["train_data_fetch_time"] = data_fetch_end - train_model_end
 
         # Move the data to the device
         inputs = inputs.to(device)
@@ -252,13 +253,21 @@ for epoch in range(1, num_epochs + 1):
                 distance = distance_to_cell_bounds(coords[0], coords[1], test_data.active_cells[pred_cell_idx])
                 epoch_stat_dict["mean_squared_error"] += distance**2
 
-            epoch_stat_dict["test_acc"] += torch.sum(preds == ground_truth).to("cpu").double()
+            epoch_stat_dict["test_acc"] += float(torch.sum(preds == ground_truth).to("cpu"))
+
+            test_model_end = time.time()
+            epoch_stat_dict["test_model_time"] += test_data_fetch_end - train_model_end
+
+    test_end = time.time()
+    epoch_stat_dict["test_time"] = test_end - train_model_end
 
     # Print the training and test loss and accuracy
     epoch_stat_dict["train_loss"] /= len(train_data)
     epoch_stat_dict["test_loss"] /= len(test_data)
     epoch_stat_dict["test_acc"] /= len(test_data)
     epoch_stat_dict["mean_squared_error"] /= len(test_data)
+
+    stats_df = stats_df.extend(pl.DataFrame(epoch_stat_dict, schema=stats_schema))
 
     logger.info(
         justify_table(

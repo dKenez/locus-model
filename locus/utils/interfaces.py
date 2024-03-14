@@ -1,3 +1,4 @@
+import datetime
 from typing import TypedDict
 
 
@@ -68,3 +69,29 @@ class QuadTreeManifest(TypedDict):
     """
 
     quadtrees: list[QuadTreeItem]
+
+
+class EpochStats(TypedDict):
+    """Structure of the epoch stats JSON file.
+
+    Params:
+        epoch (int): epoch number
+        loss (float): loss value
+        accuracy (float): accuracy value
+        val_loss (float): validation loss value
+        val_accuracy (float): validation accuracy value
+    """
+
+    epoch: int
+    epoch_start: datetime.datetime
+    train_loss: float
+    test_loss: float
+    test_acc: float
+    mean_squared_error: float
+    train_data_fetch_time: float
+    train_model_time: float
+    train_time: float
+    model_save_time: float
+    test_data_fetch_time: float
+    test_model_time: float
+    test_time: float
