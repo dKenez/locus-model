@@ -203,7 +203,7 @@ def distance_to_cell_bounds(lat: float, lon: float, cell: str):
 
     south_lat, north_lat, west_lon, east_lon = cell_bounds(cell)
     if south_lat <= lat <= north_lat and west_lon <= lon <= east_lon:
-        return 0.0  # The point is inside the square
+        return 0  # The point is inside the square
 
     def clamp(n, low, high):
         return max(low, min(n, high))
@@ -217,4 +217,4 @@ def distance_to_cell_bounds(lat: float, lon: float, cell: str):
     ]
 
     # Return the minimum distance to any edge of the square
-    return min(distances)
+    return min(distances).km

@@ -194,9 +194,9 @@ for epoch in range(1, num_epochs + 1):
             _, preds = torch.max(outputs, 1)
             _, ground_truth = torch.max(labels, 1)
 
-            for coords, cell in zip(coordinates, label_names):
+            for coords, pred_cell_idx in zip(coordinates, preds):
                 # Calculate the distance from the point to the center of the cell
-                distance = distance_to_cell_bounds(coords[0], coords[1], cell)
+                distance = distance_to_cell_bounds(coords[0], coords[1], test_data.active_cells[pred_cell_idx])
                 mean_squared_error += distance**2
 
             test_acc += torch.sum(preds == ground_truth).to("cpu")
