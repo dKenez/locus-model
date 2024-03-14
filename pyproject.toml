@@ -50,5 +50,6 @@ module = [
     "mpl_toolkits.basemap",
     "torchvision.transforms",
     "torchvision.models",
+    "randomname",
 ]
 ignore_missing_imports = true

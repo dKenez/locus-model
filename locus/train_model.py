@@ -1,10 +1,10 @@
-import logging
 import shutil
 from datetime import datetime
 from typing import cast
 
 import networkx as nx
 import psycopg2
+import randomname
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -16,7 +16,8 @@ from locus.data.QuadTree import CellState
 from locus.models.dataloader import LDoGIDataLoader
 from locus.models.dataset import LDoGIDataset
 from locus.utils.Hyperparams import Hyperparams
-from locus.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, RUNS_DIR, SQL_DIR
+from locus.utils.paths import MODELS_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, SQL_DIR
+from locus.utils.RunLogger import RunLogger
 from locus.utils.seeding import seeding
 
 # Set the seed
@@ -28,35 +29,20 @@ current_datetime = datetime.now()
 date_string = current_datetime.strftime("%Y-%m-%d")
 time_string = current_datetime.strftime("%H-%M-%S")
 
-run_dir = RUNS_DIR / f"{date_string}_{time_string}"
+run_name = randomname.generate("adj/emotions", "n/linear_algebra")
+
+run_dir = MODELS_DIR / "runs" / run_name
+monitoring_dir = MODELS_DIR / "monitoring"
 weights_dir = run_dir / "weights"
 
 run_dir.mkdir(parents=True)
+monitoring_dir.mkdir(parents=True)
 weights_dir.mkdir(parents=True)
 
 shutil.copy(PROJECT_ROOT / "train_conf.toml", run_dir / "train_conf.toml")
 log_path = run_dir / "run.log"
 
-# Set the logging configuration
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s", handlers=[])
-
-# Create a file handler and set the file name
-file_handler = logging.FileHandler(log_path)
-file_handler.setLevel(logging.DEBUG)  # You can set the level for the file handler independently
-
-# Create a console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)  # Set the level for the console handler independently
-
-# Create a formatter and add it to the handlers
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-
-# Create a logger and add the handlers
-logger = logging.getLogger()
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
+logger = RunLogger([run_dir / "run.log", monitoring_dir / "run.log"])
 
 config = dotenv_values()
 
@@ -141,10 +127,11 @@ logger.info(f"training set length:{len(train_data)}")
 logger.info(f"batches:{len(train_data)//32}")
 
 # Train the model
-for epoch in range(num_epochs):
+for epoch in range(1, num_epochs + 1):
     # Train the model on the training set
     model.train()
     train_loss = 0.0
+
     for i, (ids, inputs, labels, label_names) in enumerate(train_loader):
         if (i + 1) % 100 == 0:
             logger.info(f"batch {i+1}/{len(train_data)//32}")

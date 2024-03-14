@@ -14,7 +14,7 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 SQL_DIR = PROJECT_ROOT / "locus/utils/sql"
 
 # Weights folder
-RUNS_DIR = PROJECT_ROOT / "models/runs"
+MODELS_DIR = PROJECT_ROOT / "models"
 
 if __name__ == "__main__":
     from locus.utils.console import console
@@ -25,4 +25,4 @@ if __name__ == "__main__":
     console.print(f"{RAW_DATA_DIR=}")
     console.print(f"{PROCESSED_DATA_DIR=}")
     console.print(f"{SQL_DIR=}")
-    console.print(f"{RUNS_DIR=}")
+    console.print(f"{MODELS_DIR=}")
