@@ -134,7 +134,7 @@ def justify_table(data: list[str], widths: list[int]) -> str:
     return "".join(f"{data[i].center(widths[i])}" for i in range(len(data)))
 
 
-logger.info(justify_table(["Epoch", "Train Loss", "Test Loss", "Test Acc", "MSE", "MSSE"], [11, 14, 13, 12, 12]))
+logger.info(justify_table(["Epoch", "Train Loss", "Test Loss", "Test Acc", "MSE"], [11, 14, 13, 12, 12]))
 # Train the model
 for epoch in range(1, num_epochs + 1):
     # Train the model on the training set

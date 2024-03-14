@@ -142,7 +142,7 @@ class LDoGIDataset(Dataset):
             ims.append(im)
 
             label_names.append(calc_enclosing_cell(row["latitude"], row["longitude"], self.active_cells))
-            coords.append((np.array(row["latitude"], row["longitude"])))
+            coords.append((np.array((row["latitude"], row["longitude"]))))
 
         ims_tensor = torch.stack(ims, dim=0)
 
