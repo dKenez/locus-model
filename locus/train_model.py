@@ -1,8 +1,10 @@
 import shutil
+import time
 from datetime import datetime
 from typing import cast
 
 import networkx as nx
+import polars as pl
 import psycopg2
 import randomname
 import torch
@@ -17,6 +19,7 @@ from locus.models.model import LDoGIResnet
 from locus.utils.cell_utils import CellState, distance_to_cell_bounds
 from locus.utils.EpochProgress import EpochProgress
 from locus.utils.Hyperparams import Hyperparams
+from locus.utils.justify_table import justify_table
 from locus.utils.paths import MODELS_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, SQL_DIR
 from locus.utils.RunLogger import RunLogger
 from locus.utils.seeding import seeding
@@ -44,8 +47,6 @@ for file in monitoring_dir.glob("*"):
     if file.is_file():
         file.unlink()
 
-shutil.copy(PROJECT_ROOT / "train_conf.toml", run_dir / "train_conf.toml")
-
 logger = RunLogger([run_dir / "run.log", monitoring_dir / "run.log"])
 logger.info(f"Start run: {run_name}")
 
@@ -64,13 +65,13 @@ with open(SQL_DIR / "select_max_id.sql", "r") as f:
     sql_string = f.read()
 cur.execute(sql_string)
 records = cur.fetchall()
-max_id = int(records[0][0] * hyperparams.data_fraction)
-
 # close the connection and cursor
 cur.close()
 conn.close()
 
+
 # train test val - 70-20-10 split
+max_id = int(records[0][0] * hyperparams.data_fraction)
 from_id_train = 1
 to_id_train = int(max_id * 0.7)
 
@@ -80,15 +81,14 @@ to_id_test = from_id_test + int(max_id * 0.2)
 from_id_val = to_id_test + 1
 to_id_val = max_id
 
-QUADTREE = hyperparams.quadtree
-logger.info(f"Using quadtree: {QUADTREE}")
-G = cast(DiGraph, nx.read_gml(PROCESSED_DATA_DIR / f"LDoGI/quadtrees/{QUADTREE}"))
+logger.info(f"Using quadtree: {hyperparams.quadtree}")
+G = cast(DiGraph, nx.read_gml(PROCESSED_DATA_DIR / f"LDoGI/quadtrees/{hyperparams.quadtree}"))
 active_cells = [node for node in list(G.nodes) if G.nodes[node]["state"] == CellState.ACTIVE.value]
 num_classes = len(active_cells)
 
 # Define datasets
-train_data = LDoGIDataset(quadtree=QUADTREE, from_id=from_id_train, to_id=to_id_train)
-test_data = LDoGIDataset(quadtree=QUADTREE, from_id=from_id_test, to_id=to_id_test)
+train_data = LDoGIDataset(quadtree=hyperparams.quadtree, from_id=from_id_train, to_id=to_id_train)
+test_data = LDoGIDataset(quadtree=hyperparams.quadtree, from_id=from_id_test, to_id=to_id_test)
 
 
 # Define dataloaders
@@ -114,7 +114,16 @@ model = LDoGIResnet(num_classes)
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+
+optimizer: optim.Optimizer
+match hyperparams.optim:
+    case "sgd":
+        optimizer = optim.SGD(model.parameters(), lr=hyperparams.lr, momentum=0.9)
+    case "adam":
+        optimizer = optim.Adam(model.parameters(), lr=hyperparams.lr)
+    case other:
+        raise ValueError(f"Optimizer {hyperparams.optim} not recognized")
+
 
 # Move the model to the device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -130,16 +139,47 @@ logger.info(f"Training data: {len(train_data)} datapoints in {len(train_loader)}
 logger.info(f"Test data    : {len(test_data)} datapoints in {len(test_loader)} batches")
 
 
-def justify_table(data: list[str], widths: list[int]) -> str:
-    return "".join(f"{data[i].center(widths[i])}" for i in range(len(data)))
-
-
 logger.info(justify_table(["Epoch", "Train Loss", "Test Loss", "Test Acc", "MSE"], [11, 14, 13, 12, 12]))
 # Train the model
+
+
+stats_schema = {
+    "epoch": pl.UInt32,
+    "epoch_start": pl.Datetime,
+    "epoch_end": pl.Datetime,
+    "train_loss": pl.Float64,
+    "test_loss": pl.Float64,
+    "test_acc": pl.Float64,
+    "mean_squared_error": pl.Float64,
+    "train_data_fetch_time": pl.Duration,
+    "train_model_time": pl.Duration,
+    "train_time": pl.Duration,
+    "model_save_time": pl.Duration,
+    "test_data_fetch_time": pl.Duration,
+    "test_time": pl.Duration,
+}
+
+stats_df = pl.DataFrame({}, schema=stats_schema)
 for epoch in range(1, num_epochs + 1):
+    epoch_stat_dict = {
+        "epoch": epoch,
+        "epoch_start": datetime.now(),
+        "train_loss": 0.0,
+        "test_loss": 0.0,
+        "test_acc": 0.0,
+        "mean_squared_error": 0.0,
+        "train_data_fetch_time": 0.0,
+        "train_model_time": 0.0,
+        "train_time": 0.0,
+        "model_save_time": 0.0,
+        "test_data_fetch_time": 0.0,
+        "test_time": 0.0,
+    }
+    epoch_start = time.time()
+    train_model_end = epoch_start
+
     # Train the model on the training set
     model.train()
-    train_loss = 0.0
 
     for ids, inputs, labels, label_names, coordinates in EpochProgress(
         train_loader,
@@ -148,6 +188,9 @@ for epoch in range(1, num_epochs + 1):
         colour="blue",
         file_path=monitoring_dir / "progress.log",
     ):
+        data_fetch_end = time.time()
+        epoch_stat_dict["train_data_fetch_time"] += data_fetch_end - train_model_end
+
         # Move the data to the device
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -162,16 +205,23 @@ for epoch in range(1, num_epochs + 1):
         optimizer.step()
 
         # Update the training loss
-        train_loss += loss.item() * inputs.size(0)
+        epoch_stat_dict["train_loss"] += loss.item() * inputs.size(0)
+
+        train_model_end = time.time()
+        epoch_stat_dict["train_model_time"] += data_fetch_end - epoch_start
+
+    train_end = time.time()
+    epoch_stat_dict["train_time"] = train_end - epoch_start
 
     # Save the model weights
     torch.save(model.state_dict(), weights_dir / f"epoch_{epoch:03}.pth")
 
+    model_save_end = time.time()
+    epoch_stat_dict["model_save_time"] = model_save_end - train_end
+    train_model_end = model_save_end
+
     # Evaluate the model on the test set
     model.eval()
-    test_loss = torch.tensor(0.0)
-    test_acc = torch.tensor(0.0)
-    mean_squared_error = torch.tensor(0.0)
 
     with torch.no_grad():
         for ids, inputs, labels, label_names, coordinates in EpochProgress(
@@ -181,6 +231,9 @@ for epoch in range(1, num_epochs + 1):
             colour="green",
             file_path=monitoring_dir / "progress.log",
         ):
+            test_data_fetch_end = time.time()
+            epoch_stat_dict["test_data_fetch_time"] += test_data_fetch_end - train_model_end
+
             # Move the data to the device
             inputs = inputs.to(device)
             labels = labels.to(device)
@@ -190,30 +243,31 @@ for epoch in range(1, num_epochs + 1):
             loss = criterion(outputs, labels)
 
             # Update the test loss and accuracy
-            test_loss += loss.item() * inputs.size(0)
+            epoch_stat_dict["test_loss"] += loss.item() * inputs.size(0)
             _, preds = torch.max(outputs, 1)
             _, ground_truth = torch.max(labels, 1)
 
             for coords, cell in zip(coordinates, label_names):
                 # Calculate the distance from the point to the center of the cell
                 distance = distance_to_cell_bounds(coords[0], coords[1], cell)
-                mean_squared_error += distance**2
+                epoch_stat_dict["mean_squared_error"] += distance**2
 
-            test_acc += torch.sum(preds == ground_truth).to("cpu")
+            epoch_stat_dict["test_acc"] += torch.sum(preds == ground_truth).to("cpu").double()
 
     # Print the training and test loss and accuracy
-    train_loss /= len(train_data)
-    test_loss /= len(test_data)
-    test_acc = test_acc.double() / len(test_data)
-    mean_squared_error /= len(test_data)
+    epoch_stat_dict["train_loss"] /= len(train_data)
+    epoch_stat_dict["test_loss"] /= len(test_data)
+    epoch_stat_dict["test_acc"] /= len(test_data)
+    epoch_stat_dict["mean_squared_error"] /= len(test_data)
+
     logger.info(
         justify_table(
             [
                 f"{epoch}/{num_epochs}",
-                f"{train_loss:.4f}",
-                f"{test_loss:.4f}",
-                f"{test_acc:.4f}",
-                f"{mean_squared_error:.4f}",
+                f"{epoch_stat_dict['train_loss']:.4f}",
+                f"{epoch_stat_dict['train_loss']:.4f}",
+                f"{epoch_stat_dict['test_loss']:.4f}",
+                f"{epoch_stat_dict['mean_squared_error']:.4f}",
             ],
             [11, 14, 13, 12, 12],
         )
