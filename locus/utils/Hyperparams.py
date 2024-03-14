@@ -1,5 +1,6 @@
 import tomllib
 from pathlib import Path
+from typing import Literal
 
 
 class Hyperparams:
@@ -13,7 +14,7 @@ class Hyperparams:
         self.layers = toml_dict["layers"]
 
         self.batch_size = toml_dict["batch_size"]
-        self.optim = toml_dict["optim"]
+        self.optim: Literal["sgd", "adam"] = toml_dict["optim"]
         self.epochs = toml_dict["epochs"]
         self.lr = toml_dict["lr"]
 

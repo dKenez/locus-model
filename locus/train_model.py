@@ -1,5 +1,7 @@
+import json
 import time
 from datetime import datetime
+from math import inf
 from typing import cast
 
 import networkx as nx
@@ -18,7 +20,7 @@ from locus.models.model import LDoGIResnet
 from locus.utils.cell_utils import CellState, distance_to_cell_bounds
 from locus.utils.EpochProgress import EpochProgress
 from locus.utils.Hyperparams import Hyperparams
-from locus.utils.interfaces import EpochStats
+from locus.utils.interfaces import EpochStats, TrainStats
 from locus.utils.justify_table import justify_table
 from locus.utils.paths import MODELS_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, SQL_DIR
 from locus.utils.RunLogger import RunLogger
@@ -142,6 +144,30 @@ logger.info(f"Test data    : {len(test_data)} datapoints in {len(test_loader)} b
 logger.info(justify_table(["Epoch", "Train Loss", "Test Loss", "Test Acc", "MSE"], [11, 14, 13, 12, 12]))
 # Train the model
 
+run_start = datetime.now()
+train_stat_dict: TrainStats = {
+    "name": run_name,
+    "quadtree": hyperparams.quadtree,
+    "data_fraction": hyperparams.data_fraction,
+    "label_smoothing": hyperparams.label_smoothing,
+    "layers": hyperparams.layers,
+    "batch_size": hyperparams.batch_size,
+    "optim": hyperparams.optim,
+    "epochs": hyperparams.epochs,
+    "lr": hyperparams.lr,
+    "grace_period": hyperparams.grace_period,
+    "stopped_early": False,
+    "last_epoch": 1,
+    "best_epoch": 1,
+    "best_epoch_train_loss": 0,
+    "best_epoch_test_loss": 0,
+    "best_epoch_test_acc": 0,
+    "best_epoch_mean_squared_error": 0,
+    "run_start": run_start.strftime("%Y-%m-%d %H:%M:%S"),
+    "run_end": datetime(1, 1, 1).strftime("%Y-%m-%d %H:%M:%S"),
+    "run_time": 0,
+}
+
 
 stats_schema = {
     "epoch": pl.UInt32,
@@ -161,7 +187,18 @@ stats_schema = {
 }
 
 stats_df = pl.DataFrame({}, schema=stats_schema)
+best_epoch = 1
+best_epoch_train_loss = inf
+best_epoch_test_loss = inf
+best_epoch_test_acc = 0.0
+best_epoch_mean_squared_error = inf
+
+EARLY_STOP_TRIGGER = False
+
 for epoch in range(1, num_epochs + 1):
+    if EARLY_STOP_TRIGGER:
+        break
+
     epoch_stat_dict: EpochStats = {
         "epoch": epoch,
         "epoch_start": datetime.now(),
@@ -270,8 +307,36 @@ for epoch in range(1, num_epochs + 1):
     epoch_stat_dict["test_acc"] /= len(test_data)
     epoch_stat_dict["mean_squared_error"] /= len(test_data)
 
+    if epoch_stat_dict["test_loss"] < best_epoch_test_loss:
+        best_epoch = epoch
+        best_epoch_train_loss = epoch_stat_dict["train_loss"]
+        best_epoch_test_loss = epoch_stat_dict["test_loss"]
+        best_epoch_test_acc = epoch_stat_dict["test_acc"]
+        best_epoch_mean_squared_error = epoch_stat_dict["mean_squared_error"]
+    else:
+        # check if we are in the early stopping phase
+        if epoch - best_epoch >= hyperparams.grace_period:
+            logger.info(f"Early stopping at epoch {epoch}")
+            logger.info(f"Best epoch was {best_epoch}")
+            logger.info(f"Best test loss {best_epoch_test_loss:.4f}")
+
+            EARLY_STOP_TRIGGER = True
+            train_stat_dict["stopped_early"] = True
+
+    train_stat_dict["last_epoch"] = epoch
+    train_stat_dict["best_epoch"] = best_epoch
+    train_stat_dict["best_epoch_train_loss"] = best_epoch_train_loss
+    train_stat_dict["best_epoch_test_loss"] = best_epoch_test_loss
+    train_stat_dict["best_epoch_test_acc"] = best_epoch_test_acc
+    train_stat_dict["best_epoch_mean_squared_error"] = best_epoch_mean_squared_error
+    train_stat_dict["run_end"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    train_stat_dict["run_time"] = (datetime.now() - run_start).total_seconds()
+
     stats_df = stats_df.extend(pl.DataFrame(epoch_stat_dict, schema=stats_schema))
     stats_df.to_pandas().to_csv(run_dir / "stats.csv")
+
+    with open(run_dir / "run.json", "w") as json_file:
+        json.dump(train_stat_dict, json_file, indent=4)
 
     logger.info(
         justify_table(

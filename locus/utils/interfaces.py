@@ -1,5 +1,5 @@
 import datetime
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 
 class DescribeFileEntry(TypedDict):
@@ -69,6 +69,41 @@ class QuadTreeManifest(TypedDict):
     """
 
     quadtrees: list[QuadTreeItem]
+
+
+class TrainStats(TypedDict):
+    """Structure of the epoch stats JSON file.
+
+    Params:
+        epoch (int): epoch number
+        loss (float): loss value
+        accuracy (float): accuracy value
+        val_loss (float): validation loss value
+        val_accuracy (float): validation accuracy value
+    """
+
+    name: str
+    quadtree: str
+    data_fraction: float
+    label_smoothing: bool
+    layers: int
+    batch_size: int
+    optim: Literal["sgd", "adam"]
+    epochs: int
+    lr: float
+    grace_period: int
+
+    stopped_early: bool
+    last_epoch: int
+    best_epoch: int
+    best_epoch_train_loss: float
+    best_epoch_test_loss: float
+    best_epoch_test_acc: float
+    best_epoch_mean_squared_error: float
+
+    run_start: str
+    run_end: str
+    run_time: float
 
 
 class EpochStats(TypedDict):
