@@ -1,6 +1,6 @@
 # Data
 quadtree = "qt_min10_max1000_df10pct.gml" # check available quadtrees in data/processed/LDoGI/quadtrees
-data_fraction = 0.0002                    # 0.1 should be fine, for testing use 0.0001
+data_fraction = 0.1                    # 0.1 should be fine, for testing use 0.0001
 label_smoothing = false                    # true | false !hyperparameter
 
 # Model
