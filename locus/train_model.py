@@ -15,6 +15,7 @@ from torchvision.models import ResNet50_Weights, resnet50
 from locus.data.QuadTree import CellState
 from locus.models.dataloader import LDoGIDataLoader
 from locus.models.dataset import LDoGIDataset
+from locus.models.model import LDoGIResnet
 from locus.utils.EpochProgress import EpochProgress
 from locus.utils.Hyperparams import Hyperparams
 from locus.utils.paths import MODELS_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, SQL_DIR
@@ -109,12 +110,8 @@ test_loader = LDoGIDataLoader(
 )
 
 # Define the model
-model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+model = LDoGIResnet(num_classes)
 
-
-# Replace the last layer
-num_features = model.fc.in_features
-model.fc = nn.Linear(num_features, num_classes)
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
