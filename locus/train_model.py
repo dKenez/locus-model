@@ -14,7 +14,7 @@ from networkx import DiGraph
 from locus.models.dataloader import LDoGIDataLoader
 from locus.models.dataset import LDoGIDataset
 from locus.models.model import LDoGIResnet
-from locus.utils.cell_utils import CellState
+from locus.utils.cell_utils import CellState, distance_to_cell_bounds
 from locus.utils.EpochProgress import EpochProgress
 from locus.utils.Hyperparams import Hyperparams
 from locus.utils.paths import MODELS_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, SQL_DIR
@@ -194,15 +194,27 @@ for epoch in range(1, num_epochs + 1):
             _, preds = torch.max(outputs, 1)
             _, ground_truth = torch.max(labels, 1)
 
+            for coords, cell in zip(coordinates, label_names):
+                # Calculate the distance from the point to the center of the cell
+                distance = distance_to_cell_bounds(coords[0], coords[1], cell)
+                mean_squared_error += distance**2
+
             test_acc += torch.sum(preds == ground_truth).to("cpu")
 
     # Print the training and test loss and accuracy
     train_loss /= len(train_data)
     test_loss /= len(test_data)
     test_acc = test_acc.double() / len(test_data)
+    mean_squared_error /= len(test_data)
     logger.info(
         justify_table(
-            [f"{epoch}/{num_epochs}", f"{train_loss:.4f}", f"{test_loss:.4f}", f"{test_acc:.4f}", "Not impl."],
-            [11, 14, 13, 12, 10],
+            [
+                f"{epoch}/{num_epochs}",
+                f"{train_loss:.4f}",
+                f"{test_loss:.4f}",
+                f"{test_acc:.4f}",
+                f"{mean_squared_error:.4f}",
+            ],
+            [11, 14, 13, 12, 12],
         )
     )
