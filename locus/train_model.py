@@ -268,6 +268,7 @@ for epoch in range(1, num_epochs + 1):
     epoch_stat_dict["mean_squared_error"] /= len(test_data)
 
     stats_df = stats_df.extend(pl.DataFrame(epoch_stat_dict, schema=stats_schema))
+    stats_df.write_csv(run_dir / "stats.csv")
 
     logger.info(
         justify_table(
