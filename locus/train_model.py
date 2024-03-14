@@ -11,10 +11,10 @@ import torch.optim as optim
 from dotenv import dotenv_values
 from networkx import DiGraph
 
-from locus.data.QuadTree import CellState
 from locus.models.dataloader import LDoGIDataLoader
 from locus.models.dataset import LDoGIDataset
 from locus.models.model import LDoGIResnet
+from locus.utils.cell_utils import CellState
 from locus.utils.EpochProgress import EpochProgress
 from locus.utils.Hyperparams import Hyperparams
 from locus.utils.paths import MODELS_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, SQL_DIR
@@ -134,14 +134,14 @@ def justify_table(data: list[str], widths: list[int]) -> str:
     return "".join(f"{data[i].center(widths[i])}" for i in range(len(data)))
 
 
-logger.info(justify_table(["Epoch", "Train Loss", "Test Loss", "Test Acc", "MSE"], [11, 14, 13, 12, 10]))
+logger.info(justify_table(["Epoch", "Train Loss", "Test Loss", "Test Acc", "MSE", "MSSE"], [11, 14, 13, 12, 12]))
 # Train the model
 for epoch in range(1, num_epochs + 1):
     # Train the model on the training set
     model.train()
     train_loss = 0.0
 
-    for ids, inputs, labels, label_names in EpochProgress(
+    for ids, inputs, labels, label_names, coordinates in EpochProgress(
         train_loader,
         desc="train",
         epoch=epoch,
@@ -171,8 +171,10 @@ for epoch in range(1, num_epochs + 1):
     model.eval()
     test_loss = torch.tensor(0.0)
     test_acc = torch.tensor(0.0)
+    mean_squared_error = torch.tensor(0.0)
+
     with torch.no_grad():
-        for ids, inputs, labels, label_names in EpochProgress(
+        for ids, inputs, labels, label_names, coordinates in EpochProgress(
             test_loader,
             desc="test",
             epoch=epoch,

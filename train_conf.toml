@@ -11,3 +11,8 @@ optim = 'sgd'   # 'adam' | 'sgd' !hyperparameter
 epochs = 10     # set to 50 and use early stopping
 lr = 0.01       # 0.01 | 0.001 | 0.0001 !hyperparameter
 
+
+# implement
+# label smoothing
+# MSE loss
+# MSSE loss

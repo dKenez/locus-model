@@ -13,7 +13,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import v2
 
-from locus.data.QuadTree import CellState, calc_enclosing_cell
+from locus.utils.cell_utils import CellState, calc_enclosing_cell
 from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR
 
 
@@ -132,6 +132,7 @@ class LDoGIDataset(Dataset):
         ids = []
         ims = []
         label_names = []
+        coords = []
         for row in results_df.iter_rows(named=True):
             ids.append(row["id"])
 
@@ -141,6 +142,7 @@ class LDoGIDataset(Dataset):
             ims.append(im)
 
             label_names.append(calc_enclosing_cell(row["latitude"], row["longitude"], self.active_cells))
+            coords.append((np.array(row["latitude"], row["longitude"])))
 
         ims_tensor = torch.stack(ims, dim=0)
 
@@ -148,7 +150,9 @@ class LDoGIDataset(Dataset):
         for i, label in enumerate(label_names):
             labels[i][self.active_cells.index(label)] = 1
 
-        return np.array(ids), ims_tensor, labels, np.array(label_names)
+        coords_array = np.stack(coords)
+
+        return np.array(ids), ims_tensor, labels, np.array(label_names), coords_array
 
 
 if __name__ == "__main__":

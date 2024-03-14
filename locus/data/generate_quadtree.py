@@ -14,7 +14,8 @@ from rich.align import Align
 from rich.live import Live
 from rich.table import Table
 
-from locus.data.QuadTree import CellState, QuadTree
+from locus.data.QuadTree import QuadTree
+from locus.utils.cell_utils import CellState
 from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR
 
 

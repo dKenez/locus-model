@@ -26,8 +26,9 @@ class LDoGIDataLoader(DataLoader):
                 images_out = torch.cat([i[1] for i in mini_batches[0]])
                 labels_out = torch.cat([i[2] for i in mini_batches[0]])
                 label_names_out = np.concatenate([i[3] for i in mini_batches[0]])
+                coordinates_out = np.concatenate([i[4] for i in mini_batches[0]])
 
-                return ids_out, images_out, labels_out, label_names_out
+                return ids_out, images_out, labels_out, label_names_out, coordinates_out
 
             super(LDoGIDataLoader, self).__init__(
                 dataset=dataset, batch_size=batch_size, sampler=_sampler, collate_fn=cf, **kwargs
