@@ -165,7 +165,7 @@ for epoch in range(1, num_epochs + 1):
     epoch_stat_dict: EpochStats = {
         "epoch": epoch,
         "epoch_start": datetime.now(),
-        "epoch_end": 0,
+        "epoch_end": datetime(1, 1, 1),
         "train_loss": 0,
         "test_loss": 0,
         "test_acc": 0,
@@ -192,7 +192,7 @@ for epoch in range(1, num_epochs + 1):
         file_path=monitoring_dir / "progress.log",
     ):
         data_fetch_end = time.time()
-        epoch_stat_dict["train_data_fetch_time"] = data_fetch_end - train_model_end
+        epoch_stat_dict["train_data_fetch_time"] += data_fetch_end - train_model_end
 
         # Move the data to the device
         inputs = inputs.to(device)
@@ -271,7 +271,7 @@ for epoch in range(1, num_epochs + 1):
     epoch_stat_dict["mean_squared_error"] /= len(test_data)
 
     stats_df = stats_df.extend(pl.DataFrame(epoch_stat_dict, schema=stats_schema))
-    stats_df.write_csv(run_dir / "stats.csv")
+    stats_df.to_pandas().to_csv(run_dir / "stats.csv")
 
     logger.info(
         justify_table(
