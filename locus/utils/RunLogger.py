@@ -2,6 +2,8 @@ import logging
 from pathlib import Path
 from typing import Iterable, Union
 
+logging.basicConfig(level=logging.INFO, handlers=[])
+
 
 def RunLogger(log_paths: Iterable[Union[Path, str]]):
     runLogger = logging.getLogger("runLogger")

@@ -31,18 +31,22 @@ time_string = current_datetime.strftime("%H-%M-%S")
 
 run_name = randomname.generate("adj/emotions", "n/linear_algebra")
 
-run_dir = MODELS_DIR / "runs" / run_name
 monitoring_dir = MODELS_DIR / "monitoring"
+run_dir = MODELS_DIR / "runs" / run_name
 weights_dir = run_dir / "weights"
 
-run_dir.mkdir(parents=True)
-monitoring_dir.mkdir(parents=True)
+monitoring_dir.mkdir(parents=True, exist_ok=True)
 weights_dir.mkdir(parents=True)
 
+# remove all files from the monitoring directory
+for file in monitoring_dir.glob("*"):
+    if file.is_file():
+        file.unlink()
+
 shutil.copy(PROJECT_ROOT / "train_conf.toml", run_dir / "train_conf.toml")
-log_path = run_dir / "run.log"
 
 logger = RunLogger([run_dir / "run.log", monitoring_dir / "run.log"])
+logger.info(f"Start run: {run_name}")
 
 config = dotenv_values()
 
@@ -76,6 +80,7 @@ from_id_val = to_id_test + 1
 to_id_val = max_id
 
 QUADTREE = hyperparams.quadtree
+logger.info(f"Using quadtree: {QUADTREE}")
 G = cast(DiGraph, nx.read_gml(PROCESSED_DATA_DIR / f"LDoGI/quadtrees/{QUADTREE}"))
 active_cells = [node for node in list(G.nodes) if G.nodes[node]["state"] == CellState.ACTIVE.value]
 num_classes = len(active_cells)
@@ -117,15 +122,22 @@ optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 # Move the model to the device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
-print(device)
+logger.info(f"Using device: {device}")
 
 
 # Define the number of epochs
 num_epochs = hyperparams.epochs
 
-logger.info(f"training set length:{len(train_data)}")
-logger.info(f"batches:{len(train_data)//32}")
+logger.info(f"Batch size: {hyperparams.batch_size}")
+logger.info(f"Training data: {len(train_data)} datapoints in {len(train_loader)} batches")
+logger.info(f"Test data    : {len(test_data)} datapoints in {len(test_loader)} batches")
 
+
+def justify_table(data: list[str], widths: list[int]) -> str:
+    return "".join(f"{data[i].center(widths[i])}" for i in range(len(data)))
+
+
+logger.info(justify_table(["Epoch", "Train Loss", "Test Loss", "Test Acc", "MSE"], [11, 14, 13, 12, 10]))
 # Train the model
 for epoch in range(1, num_epochs + 1):
     # Train the model on the training set
@@ -152,7 +164,7 @@ for epoch in range(1, num_epochs + 1):
         train_loss += loss.item() * inputs.size(0)
 
     # Save the model weights
-    torch.save(model.state_dict(), weights_dir / f"epoch_{epoch+1:03}.pth")
+    torch.save(model.state_dict(), weights_dir / f"epoch_{epoch:03}.pth")
 
     # Evaluate the model on the test set
     model.eval()
@@ -173,12 +185,15 @@ for epoch in range(1, num_epochs + 1):
             _, preds = torch.max(outputs, 1)
             _, ground_truth = torch.max(labels, 1)
 
-            test_acc += torch.sum(preds == ground_truth)
+            test_acc += torch.sum(preds == ground_truth).to("cpu")
 
     # Print the training and test loss and accuracy
     train_loss /= len(train_data)
     test_loss /= len(test_data)
     test_acc = test_acc.double() / len(test_data)
     logger.info(
-        f"Epoch [{epoch + 1}/{num_epochs}] Train Loss: {train_loss:.4f} Test Loss: {test_loss:.4f} Test Acc: {test_acc:.4f}"  # noqa: E501
+        justify_table(
+            [f"{epoch}/{num_epochs}", f"{train_loss:.4f}", f"{test_loss:.4f}", f"{test_acc:.4f}", "Not impl."],
+            [11, 14, 13, 12, 10],
+        )
     )
