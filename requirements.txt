@@ -6,10 +6,11 @@ msgpack_python==0.5.6
 networkx==3.2.1
 numpy==1.26.4
 Pillow==10.2.0
-polars==0.20.14
+polars==0.20.10
 psycopg2_binary==2.9.9
 python-dotenv==1.0.1
-rich==13.7.1
+randomname==0.2.1
+rich==13.7.0
 torch==2.2.1
 torchvision==0.17.1
 tqdm==4.66.2

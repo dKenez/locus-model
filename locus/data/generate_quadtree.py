@@ -1,6 +1,7 @@
 import json
 import threading
 import time
+from typing import Optional
 
 import click
 import networkx as nx
@@ -138,8 +139,8 @@ def partition_quadtree(tree: QuadTree, conn: connection, tau_min: int, tau_max: 
 @click.option("--tau-min", default=50, help="Minimum number of data points in a cell.")
 @click.option("--tau-max", default=2000, help="Maximum number of data points in a cell.")
 @click.option("--data-fraction", default=0.1, help="Fraction of the data to use.")
-@click.option("--output", help="Output file for saving the QuadTree.")
-def main(tau_min: int, tau_max: int, data_fraction: float, output: str):
+@click.option("--output", default=None, help="Output file for saving the QuadTree.")
+def main(tau_min: int, tau_max: int, data_fraction: float, output: Optional[str]):
     """Generate a quadtree from a dataset of image locations.
 
     Args:
@@ -149,11 +150,20 @@ def main(tau_min: int, tau_max: int, data_fraction: float, output: str):
         ValueError: If dataset is not supported.
     """
 
+    # check if datafraction is between 0 and 1
+    if data_fraction <= 0:
+        raise ValueError("Datafraction cannot be less than or equal to 0")
+    if data_fraction > 1:
+        raise ValueError("Datafraction cannot be larger than 1")
+
     # check if tau min is less than tau max and larger than 0
     if tau_min > tau_max:
         raise ValueError("tau_min must be less than tau_max")
     if tau_min < 0:
         raise ValueError("tau_min must be larger than 0")
+
+    if output is None:
+        output = f"qt_min{tau_min}_max{tau_max}_df{int(data_fraction*100)}pct.gml"
 
     # check if quadtrees directory exists else create it
     quadtrees_dir = PROCESSED_DATA_DIR / "LDoGI" / "quadtrees"
