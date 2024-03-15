@@ -236,7 +236,7 @@ for epoch in range(1, num_epochs + 1):
         desc="train",
         epoch=epoch,
         colour="blue",
-        file_path=monitoring_dir / "progress.log",
+        file_path=run_dir / "progress.log",
     ):
         data_fetch_end = time.time()
         epoch_stat_dict["train_data_fetch_time"] += data_fetch_end - train_model_end

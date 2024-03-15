@@ -1,5 +1,6 @@
 import json
 from io import BytesIO
+from pathlib import Path
 from typing import Iterable, cast
 
 import networkx as nx
@@ -13,14 +14,23 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import v2
 
-from locus.utils.cell_utils import CellState, calc_enclosing_cell
+from locus.utils.cell_utils import CellState, calc_enclosing_cell, distance_to_cell_center
+from locus.utils.normal_distribution import normal_distribution
 from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR
 
 
 class LDoGIDataset(Dataset):
     __len = None
 
-    def __init__(self, quadtree: str, from_id: int = 1, to_id: int | None = None, *, env: str = ".env"):
+    def __init__(
+        self,
+        quadtree: str,
+        from_id: int = 1,
+        to_id: int | None = None,
+        label_smoothing: bool = False,
+        *,
+        env: Path | str = ".env",
+    ):
         config = dotenv_values(env)
 
         self.conn = psycopg2.connect(
@@ -75,6 +85,8 @@ class LDoGIDataset(Dataset):
 
         self.from_id = from_id
         self.to_id = to_id or max_id
+
+        self.label_smoothing = label_smoothing
 
     def __del__(self):
         self.cur.close()
@@ -145,18 +157,38 @@ class LDoGIDataset(Dataset):
             coords.append((np.array((row["latitude"], row["longitude"]))))
 
         ims_tensor = torch.stack(ims, dim=0)
+        coords_array = np.stack(coords)
 
         labels = torch.zeros((len(label_names), len(self.active_cells)), dtype=torch.float32)
         for i, label in enumerate(label_names):
             labels[i][self.active_cells.index(label)] = 1
 
-        coords_array = np.stack(coords)
+        if self.label_smoothing:
+            smoothing_labels = torch.zeros((len(label_names), len(self.active_cells)), dtype=torch.float32)
+
+            mean = 0  # Mean of the distribution
+            std = 20  # [km] Standard deviation of the distribution
+
+            for test_cell_idx in range(smoothing_labels.shape[1]):
+                test_cell = self.active_cells[test_cell_idx]
+                for batch_idx in range(smoothing_labels.shape[0]):
+                    target_coords = coords_array[batch_idx]
+
+                    # distance of cell from target cell
+                    dist = distance_to_cell_center(target_coords[0], target_coords[1], test_cell)
+                    smoothing_weight = normal_distribution(dist.km, mean, std)
+
+                    smoothing_labels[batch_idx][test_cell_idx] = smoothing_weight
+
+            labels += smoothing_labels
+
+            labels = (labels.T / labels.sum(dim=1)).T
 
         return np.array(ids), ims_tensor, labels, np.array(label_names), coords_array
 
 
 if __name__ == "__main__":
-    dataset = LDoGIDataset("qt_min50_max2000_df1.gml", from_id=1, to_id=1_000_000)
+    dataset = LDoGIDataset("qt_min10_max1000_df10pct.gml", from_id=1, to_id=1_000_000, label_smoothing=True)
     fetch_idxs = [i for i in range(20)]
     # fetch_idxs.append(1_200_000)
     results = dataset[fetch_idxs]
