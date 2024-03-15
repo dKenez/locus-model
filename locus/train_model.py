@@ -49,8 +49,14 @@ for file in monitoring_dir.glob("*"):
     if file.is_file():
         file.unlink()
 
-logger = RunLogger([run_dir / "run.log", monitoring_dir / "run.log"])
+logger = RunLogger(
+    [
+        run_dir / "run.log",
+        # monitoring_dir / "run.log"
+    ]
+)
 logger.info(f"Start run: {run_name}")
+print(f"Start run: {run_name}")
 
 config = dotenv_values()
 
@@ -89,8 +95,12 @@ active_cells = [node for node in list(G.nodes) if G.nodes[node]["state"] == Cell
 num_classes = len(active_cells)
 
 # Define datasets
-train_data = LDoGIDataset(quadtree=hyperparams.quadtree, from_id=from_id_train, to_id=to_id_train)
-test_data = LDoGIDataset(quadtree=hyperparams.quadtree, from_id=from_id_test, to_id=to_id_test)
+train_data = LDoGIDataset(
+    quadtree=hyperparams.quadtree, from_id=from_id_train, to_id=to_id_train, env=PROJECT_ROOT / ".env"
+)
+test_data = LDoGIDataset(
+    quadtree=hyperparams.quadtree, from_id=from_id_test, to_id=to_id_test, env=PROJECT_ROOT / ".env"
+)
 
 
 # Define dataloaders
@@ -269,7 +279,7 @@ for epoch in range(1, num_epochs + 1):
             desc="test",
             epoch=epoch,
             colour="green",
-            file_path=monitoring_dir / "progress.log",
+            file_path=run_dir / "progress.log",
         ):
             test_data_fetch_end = time.time()
             epoch_stat_dict["test_data_fetch_time"] += test_data_fetch_end - train_model_end
@@ -307,6 +317,19 @@ for epoch in range(1, num_epochs + 1):
     epoch_stat_dict["test_acc"] /= len(test_data)
     epoch_stat_dict["mean_squared_error"] /= len(test_data)
 
+    logger.info(
+        justify_table(
+            [
+                f"{epoch}/{num_epochs}",
+                f"{epoch_stat_dict['train_loss']:.4f}",
+                f"{epoch_stat_dict['test_loss']:.4f}",
+                f"{epoch_stat_dict['test_acc']:.4f}",
+                f"{epoch_stat_dict['mean_squared_error']:.4f}",
+            ],
+            [11, 14, 13, 12, 12],
+        )
+    )
+
     if epoch_stat_dict["test_loss"] < best_epoch_test_loss:
         best_epoch = epoch
         best_epoch_train_loss = epoch_stat_dict["train_loss"]
@@ -337,16 +360,3 @@ for epoch in range(1, num_epochs + 1):
 
     with open(run_dir / "run.json", "w") as json_file:
         json.dump(train_stat_dict, json_file, indent=4)
-
-    logger.info(
-        justify_table(
-            [
-                f"{epoch}/{num_epochs}",
-                f"{epoch_stat_dict['train_loss']:.4f}",
-                f"{epoch_stat_dict['train_loss']:.4f}",
-                f"{epoch_stat_dict['test_loss']:.4f}",
-                f"{epoch_stat_dict['mean_squared_error']:.4f}",
-            ],
-            [11, 14, 13, 12, 12],
-        )
-    )
