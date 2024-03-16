@@ -129,7 +129,7 @@ test_loader = LDoGIDataLoader(
 )
 
 # Define the model
-model = LDoGIResnet(num_classes)
+model = LDoGIResnet(num_classes, hyperparams.layers)
 
 
 # Define the loss function and optimizer
