@@ -44,57 +44,44 @@ def train_model(conf: str):
 
     runs_manifest = MODELS_DIR / "runs" / "manifest.csv"
 
-    manifest_schema = {
-        "name": pl.String,
-        "run_start": pl.String,
-        "quadtree": pl.String,
-        "data_fraction": pl.Float32,
-        "label_smoothing": pl.Boolean,
-        "layers": pl.Int32,
-        "batch_size": pl.Int32,
-        "optim": pl.String,
-        "epochs": pl.Int32,
-        "lr": pl.Float32,
-        "grace_period": pl.Int32,
-    }
     if not runs_manifest.exists():
         runs_manifest.write_text(
             "name,run_start,quadtree,data_fraction,label_smoothing,layers,batch_size,optim,epochs,lr,grace_period\n"
         )
 
-    # read the manifest into a DataFrame
-    run_data_df = pl.read_csv(runs_manifest, schema=manifest_schema)
-
     run_name = randomname.generate("adj/emotions", "n/linear_algebra")
-    run_name_trial = 0
-    while run_name in run_data_df["name"]:
-        run_name = randomname.generate("adj/emotions", "n/linear_algebra")
-        run_name_trial += 1
-        if run_name_trial > 100:
-            raise ValueError(f"Run {run_name} already exists")
 
-    # append the new run to the manifest
-    my_df = pl.DataFrame(
-        {
-            "name": run_name,
-            "run_start": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "quadtree": hyperparams.quadtree,
-            "data_fraction": hyperparams.data_fraction,
-            "label_smoothing": hyperparams.label_smoothing,
-            "layers": hyperparams.layers,
-            "batch_size": hyperparams.batch_size,
-            "optim": hyperparams.optim,
-            "epochs": hyperparams.epochs,
-            "lr": hyperparams.lr,
-            "grace_period": hyperparams.grace_period,
-        },
-        schema=manifest_schema,
-    )
+    with open(runs_manifest, "r") as f:
+        for i in range(100):
+            name_conflict = False
+            for line in f.readlines():
+                if run_name == line.split(",")[0]:
+                    name_conflict = True
+                    break
 
-    # append the new run to the manifest
-    run_data_df = pl.concat([run_data_df, my_df], rechunk=True)
+            if name_conflict:
+                run_name = randomname.generate("adj/emotions", "n/linear_algebra")
+                continue
+            else:
+                break
+        else:
+            raise ValueError("Couldn't find a unique run name after 100 tries")
 
-    run_data_df.write_csv(MODELS_DIR / "runs" / "manifest.csv")
+    with open(runs_manifest, "a") as f:
+        data_to_write = [
+            run_name,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            hyperparams.quadtree,
+            hyperparams.data_fraction,
+            hyperparams.label_smoothing,
+            hyperparams.layers,
+            hyperparams.batch_size,
+            hyperparams.optim,
+            hyperparams.epochs,
+            hyperparams.lr,
+            hyperparams.grace_period,
+        ]
+        f.write(",".join([str(data) for data in data_to_write]) + "\n")
 
     run_dir = MODELS_DIR / "runs" / run_name
     weights_dir = run_dir / "weights"
