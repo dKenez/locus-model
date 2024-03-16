@@ -96,10 +96,18 @@ num_classes = len(active_cells)
 
 # Define datasets
 train_data = LDoGIDataset(
-    quadtree=hyperparams.quadtree, from_id=from_id_train, to_id=to_id_train, env=PROJECT_ROOT / ".env"
+    quadtree=hyperparams.quadtree,
+    from_id=from_id_train,
+    to_id=to_id_train,
+    label_smoothing=hyperparams.label_smoothing,
+    env=PROJECT_ROOT / ".env",
 )
 test_data = LDoGIDataset(
-    quadtree=hyperparams.quadtree, from_id=from_id_test, to_id=to_id_test, env=PROJECT_ROOT / ".env"
+    quadtree=hyperparams.quadtree,
+    from_id=from_id_test,
+    to_id=to_id_test,
+    label_smoothing=hyperparams.label_smoothing,
+    env=PROJECT_ROOT / ".env",
 )
 
 
