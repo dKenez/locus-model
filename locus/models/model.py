@@ -47,4 +47,6 @@ class LDoGIResnet(torch.nn.Module):
 
     def forward(self, x):
         # Forward pass through the network
-        return self.resnet(x)
+        x = self.resnet(x)
+        # Apply softmax to get probabilities
+        return torch.softmax(x, dim=1)
