@@ -12,8 +12,8 @@ from dotenv import dotenv_values
 from networkx import DiGraph
 from PIL import Image
 from torch.utils.data import Dataset
-from torchvision.transforms import v2
 
+from locus.models.transforms import LDoGItransforms
 from locus.utils.cell_utils import CellState, calc_enclosing_cell, distance_to_cell_center
 from locus.utils.normal_distribution import normal_distribution
 from locus.utils.paths import PROCESSED_DATA_DIR, SQL_DIR
@@ -62,18 +62,7 @@ class LDoGIDataset(Dataset):
         self.excluded_ids = self.excluded_ids or [-1]
 
         self.active_cells = active_cells
-        self.transforms = v2.Compose(
-            [
-                v2.ToImage(),  # Convert to tensor, only needed if you had a PIL image
-                # ...
-                v2.ToDtype(torch.float32, scale=True),  # Normalize expects float input
-                v2.Resize(224, antialias=True),
-                v2.RandomCrop(size=(224)),  # Or Resize(antialias=True)
-                # ...
-                v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                # v2.ToDtype(torch.uint8, scale=True),
-            ]
-        )
+        self.transforms = LDoGItransforms
 
         with open(SQL_DIR / "select_max_id.sql", "r") as f:
             sql_string = f.read()
