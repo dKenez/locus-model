@@ -79,7 +79,7 @@ async def predict(img: UploadFile):
     with torch.no_grad():
         output = model(t_img)
 
-    cell_predictions = {active_cells[i]: float(prob) for i, prob in enumerate(output[0])}
+    cell_predictions = [(active_cells[i], float(prob)) for i, prob in enumerate(output[0])]
 
     return cell_predictions
 
