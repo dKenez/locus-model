@@ -29,7 +29,7 @@ from locus.utils.RunLogger import RunLogger
 from locus.utils.seeding import seeding
 
 
-def train_model(conf: str):
+def train_model(conf: str, cont: str):
     """
     Train a model using the specified configuration file.
 
@@ -40,57 +40,77 @@ def train_model(conf: str):
     # Set the seed
     seeding(42)
 
-    hyperparams = Hyperparams(Path(conf))
+    runs_dir = MODELS_DIR / "runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
 
-    runs_manifest = MODELS_DIR / "runs" / "manifest.csv"
+    runs_manifest = runs_dir / "manifest.csv"
 
     if not runs_manifest.exists():
         runs_manifest.write_text(
             "name,run_start,quadtree,data_fraction,label_smoothing,layers,batch_size,optim,epochs,lr,grace_period\n"
         )
 
+    hyperparams = Hyperparams(Path(conf))
     run_name = randomname.generate("adj/emotions", "n/linear_algebra")
 
-    with open(runs_manifest, "r") as f:
-        for i in range(100):
-            name_conflict = False
-            for line in f.readlines():
-                if run_name == line.split(",")[0]:
-                    name_conflict = True
+    if cont:
+        if cont == "last":
+            with open(runs_manifest, "r") as f:
+                lines = f.readlines()
+                last_line = lines[-1]
+                run_name = last_line.split(",")[0]
+
+        run_name = cont
+        print(f"Continuing training model {run_name}")
+
+        hyperparams = Hyperparams(runs_dir / run_name / "run.json")
+        seeding(43)
+
+    else:
+        if not Path(conf).exists():
+            raise ValueError(f"Configuration file {conf} not found")
+        print(f"Training model using configuration file: {conf}")
+
+        with open(runs_manifest, "r") as f:
+            for i in range(100):
+                name_conflict = False
+                for line in f.readlines():
+                    if run_name == line.split(",")[0]:
+                        name_conflict = True
+                        break
+
+                if name_conflict:
+                    run_name = randomname.generate("adj/emotions", "n/linear_algebra")
+                    continue
+                else:
                     break
-
-            if name_conflict:
-                run_name = randomname.generate("adj/emotions", "n/linear_algebra")
-                continue
             else:
-                break
-        else:
-            raise ValueError("Couldn't find a unique run name after 100 tries")
+                raise ValueError("Couldn't find a unique run name after 100 tries")
 
-    with open(runs_manifest, "a") as f:
-        data_to_write = [
-            run_name,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            hyperparams.quadtree,
-            hyperparams.data_fraction,
-            hyperparams.label_smoothing,
-            hyperparams.layers,
-            hyperparams.batch_size,
-            hyperparams.optim,
-            hyperparams.epochs,
-            hyperparams.lr,
-            hyperparams.grace_period,
-        ]
-        f.write(",".join([str(data) for data in data_to_write]) + "\n")
+        with open(runs_manifest, "a") as f:
+            data_to_write = [
+                run_name,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                hyperparams.quadtree,
+                hyperparams.data_fraction,
+                hyperparams.label_smoothing,
+                hyperparams.layers,
+                hyperparams.batch_size,
+                hyperparams.optim,
+                hyperparams.epochs,
+                hyperparams.lr,
+                hyperparams.grace_period,
+            ]
+            f.write(",".join([str(data) for data in data_to_write]) + "\n")
 
-    run_dir = MODELS_DIR / "runs" / run_name
-    weights_dir = run_dir / "weights"
+    current_run_dir = MODELS_DIR / "runs" / run_name
+    weights_dir = current_run_dir / "weights"
 
     weights_dir.mkdir(parents=True)
 
     logger = RunLogger(
         [
-            run_dir / "run.log",
+            current_run_dir / "run.log",
         ]
     )
     logger.info(f"Start run: {run_name}")
@@ -164,8 +184,27 @@ def train_model(conf: str):
         prefetch_factor=10,
     )
 
+    # Move the model to the device
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
     # Define the model
     model = LDoGIResnet(num_classes, hyperparams.layers)
+    model = model.to(device)
+    logger.info(f"Using device: {device}")
+
+    # if we are continuing training, load the weights
+    start_epoch = 1
+    if cont:
+        # get the last epoch
+        # order the weights dir by the epoch number
+        # load the weights from the last epoch
+
+        b = sorted([_ for _ in weights_dir.glob("*.pth")])[-1]
+        print(b)
+        last_epoch = int(b.stem.split("_")[-1])
+        start_epoch = last_epoch + 1
+
+        model.load_state_dict(torch.load(weights_dir / f"epoch_{last_epoch:03}.pth", map_location=torch.device(device)))
 
     # Define the loss function and optimizer
     criterion = nn.CrossEntropyLoss()
@@ -178,11 +217,6 @@ def train_model(conf: str):
             optimizer = optim.Adam(model.parameters(), lr=hyperparams.lr)
         case _:
             raise ValueError(f"Optimizer {hyperparams.optim} not recognized")
-
-    # Move the model to the device
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-    logger.info(f"Using device: {device}")
 
     # Define the number of epochs
     num_epochs = hyperparams.epochs
@@ -244,7 +278,7 @@ def train_model(conf: str):
 
     EARLY_STOP_TRIGGER = False
 
-    for epoch in range(1, num_epochs + 1):
+    for epoch in range(start_epoch, num_epochs + 1):
         if EARLY_STOP_TRIGGER:
             break
 
@@ -275,7 +309,7 @@ def train_model(conf: str):
             desc="train",
             epoch=epoch,
             colour="blue",
-            file_path=run_dir / "progress.log",
+            file_path=current_run_dir / "progress.log",
         ):
             data_fetch_end = time.time()
             epoch_stat_dict["train_data_fetch_time"] += data_fetch_end - train_model_end
@@ -319,7 +353,7 @@ def train_model(conf: str):
                 desc="test",
                 epoch=epoch,
                 colour="green",
-                file_path=run_dir / "progress.log",
+                file_path=current_run_dir / "progress.log",
             ):
                 test_data_fetch_end = time.time()
                 epoch_stat_dict["test_data_fetch_time"] += test_data_fetch_end - test_model_end
@@ -395,15 +429,22 @@ def train_model(conf: str):
         train_stat_dict["run_time"] = (datetime.now() - run_start).total_seconds()
 
         stats_df = stats_df.extend(pl.DataFrame(epoch_stat_dict, schema=stats_schema))
-        stats_df.to_pandas().to_csv(run_dir / "stats.csv")
+        stats_df.to_pandas().to_csv(current_run_dir / "stats.csv")
 
-        with open(run_dir / "run.json", "w") as json_file:
+        with open(current_run_dir / "run.json", "w") as json_file:
             json.dump(train_stat_dict, json_file, indent=4)
 
 
 @click.command()
 @click.option("--conf", help="Training configuration file.", default=PROJECT_ROOT / "train_conf.toml")
-def main(conf: str):
+@click.option(
+    "--cont",
+    help="Continue training of model. Supply the training name.",
+    is_flag=False,
+    flag_value="last",
+    default="",
+)
+def main(conf: str, cont: str):
     """
     Train a model using the specified configuration file.
 
@@ -411,7 +452,7 @@ def main(conf: str):
         conf (str): Path to the configuration file.
     """
 
-    train_model(conf)
+    train_model(conf, cont)
 
 
 if __name__ == "__main__":

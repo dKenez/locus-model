@@ -1,3 +1,4 @@
+import json
 import tomllib
 from pathlib import Path
 from typing import Literal
@@ -5,20 +6,31 @@ from typing import Literal
 
 class Hyperparams:
     def __init__(self, path: Path):
-        toml_dict = tomllib.loads(path.read_text())
+        # if is toml file
 
-        self.quadtree = toml_dict["quadtree"]
-        self.data_fraction = toml_dict["data_fraction"]
-        self.label_smoothing = toml_dict["label_smoothing"]
+        conf_dict = {}
 
-        self.layers = toml_dict["layers"]
+        match path.suffix:
+            case ".toml":
+                conf_dict = tomllib.loads(path.read_text())
 
-        self.batch_size = toml_dict["batch_size"]
-        self.optim: Literal["sgd", "adam"] = toml_dict["optim"]
-        self.epochs = toml_dict["epochs"]
-        self.lr = toml_dict["lr"]
+            case ".json":
+                conf_dict = json.loads(path.read_text())
+            case _:
+                raise ValueError("Unsupported file format")
 
-        self.grace_period = toml_dict["grace_period"]
+        self.quadtree = conf_dict["quadtree"]
+        self.data_fraction = conf_dict["data_fraction"]
+        self.label_smoothing = conf_dict["label_smoothing"]
+
+        self.layers = conf_dict["layers"]
+
+        self.batch_size = conf_dict["batch_size"]
+        self.optim: Literal["sgd", "adam"] = conf_dict["optim"]
+        self.epochs = conf_dict["epochs"]
+        self.lr = conf_dict["lr"]
+
+        self.grace_period = conf_dict["grace_period"]
 
 
 if __name__ == "__main__":
