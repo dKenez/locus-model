@@ -5,6 +5,7 @@ import networkx as nx  # Import the missing package
 import torch
 import uvicorn
 from fastapi import FastAPI, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from networkx import DiGraph
 from PIL import Image
 from pydantic import BaseModel
@@ -16,6 +17,21 @@ from locus.utils.paths import MODELS_DIR, PROCESSED_DATA_DIR
 
 app = FastAPI()
 
+origins = [
+    "http://localhost",
+    "http://localhost:5173",
+    "localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 QT = "qt_min10_max1000_df10pct.gml"
 G = cast(DiGraph, nx.read_gml(PROCESSED_DATA_DIR / f"LDoGI/quadtrees/{QT}"))
@@ -26,7 +42,7 @@ num_classes = len(active_cells)
 model = LDoGIResnet(classes=num_classes, layers=50)
 
 model.load_state_dict(
-    torch.load(MODELS_DIR / "runs/sad-column/weights/epoch_004.pth", map_location=torch.device("cpu"))
+    torch.load(MODELS_DIR / "runs/weary-subspace/weights/epoch_003.pth", map_location=torch.device("cpu"))
 )
 
 
@@ -53,10 +69,10 @@ def update_item(item_id: int, item: Item):
 
 @app.post("/predict/")
 async def predict(img: UploadFile):
-    t_img = await img.read()
-    t_img = BytesIO(t_img)
-    t_img = Image.open(t_img)
-    t_img = LDoGItransforms(t_img)
+    img_read = await img.read()
+    img_bytes = BytesIO(img_read)
+    pil_img = Image.open(img_bytes)
+    t_img = LDoGItransforms(pil_img)
     t_img = t_img.unsqueeze(0)
 
     model.eval()
