@@ -1,7 +1,7 @@
 # Data
 quadtree = "qt_min10_max1000_df10pct.gml" # check available quadtrees in data/processed/LDoGI/quadtrees
-data_fraction = 0.1                    # 0.1 should be fine, for testing use 0.0001
-label_smoothing = false                    # true | false !hyperparameter
+data_fraction = 0.00001                   # 0.1 should be fine, for testing use 0.0001
+label_smoothing = false                   # true | false !hyperparameter
 
 # Model
 layers = 50 # 18 | 34 | 50 | 101 | 152 !hyperparameter
@@ -10,6 +10,6 @@ layers = 50 # 18 | 34 | 50 | 101 | 152 !hyperparameter
 batch_size = 32 # 32 | 64 | 128 !hyperparameter
 optim = 'sgd'   # 'adam' | 'sgd' !hyperparameter
 epochs = 30     # set to 30 and use early stopping
-lr = 0.001       # 0.01 | 0.001 | 0.0001 !hyperparameter
+lr = 0.001      # 0.01 | 0.001 | 0.0001 !hyperparameter
 
-grace_period = 5 # grace period for early stopping
+grace_period = 30 # grace period for early stopping

@@ -52,18 +52,24 @@ def train_model(conf: str, cont: str):
 
     hyperparams = Hyperparams(Path(conf))
     run_name = randomname.generate("adj/emotions", "n/linear_algebra")
-
+    base_run_name = cont
     if cont:
         if cont == "last":
             with open(runs_manifest, "r") as f:
                 lines = f.readlines()
                 last_line = lines[-1]
-                run_name = last_line.split(",")[0]
+                base_run_name = last_line.split(",")[0]
 
-        run_name = cont
-        print(f"Continuing training model {run_name}")
+        num = 1
+        s = base_run_name.split("_")
+        if len(s) > 1:
+            num = int(s[-1]) + 1
 
-        hyperparams = Hyperparams(runs_dir / run_name / "run.json")
+        run_name = f"{s[0]}_{num}"
+
+        print(f"Continuing training model {base_run_name} as {run_name}")
+
+        hyperparams = Hyperparams(runs_dir / base_run_name / "run.json")
         seeding(43)
 
     else:
@@ -87,26 +93,26 @@ def train_model(conf: str, cont: str):
             else:
                 raise ValueError("Couldn't find a unique run name after 100 tries")
 
-        with open(runs_manifest, "a") as f:
-            data_to_write = [
-                run_name,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                hyperparams.quadtree,
-                hyperparams.data_fraction,
-                hyperparams.label_smoothing,
-                hyperparams.layers,
-                hyperparams.batch_size,
-                hyperparams.optim,
-                hyperparams.epochs,
-                hyperparams.lr,
-                hyperparams.grace_period,
-            ]
-            f.write(",".join([str(data) for data in data_to_write]) + "\n")
+    with open(runs_manifest, "a") as f:
+        data_to_write = [
+            run_name,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            hyperparams.quadtree,
+            hyperparams.data_fraction,
+            hyperparams.label_smoothing,
+            hyperparams.layers,
+            hyperparams.batch_size,
+            hyperparams.optim,
+            hyperparams.epochs,
+            hyperparams.lr,
+            hyperparams.grace_period,
+        ]
+        f.write(",".join([str(data) for data in data_to_write]) + "\n")
 
     current_run_dir = MODELS_DIR / "runs" / run_name
     weights_dir = current_run_dir / "weights"
 
-    weights_dir.mkdir(parents=True)
+    weights_dir.mkdir(parents=True, exist_ok=True)
 
     logger = RunLogger(
         [
@@ -198,13 +204,14 @@ def train_model(conf: str, cont: str):
         # get the last epoch
         # order the weights dir by the epoch number
         # load the weights from the last epoch
-
-        b = sorted([_ for _ in weights_dir.glob("*.pth")])[-1]
-        print(b)
+        base_weights_dir = runs_dir / base_run_name / "weights"
+        b = sorted([_ for _ in base_weights_dir.glob("*.pth")])[-1]
         last_epoch = int(b.stem.split("_")[-1])
         start_epoch = last_epoch + 1
 
-        model.load_state_dict(torch.load(weights_dir / f"epoch_{last_epoch:03}.pth", map_location=torch.device(device)))
+        model.load_state_dict(
+            torch.load(base_weights_dir / f"epoch_{last_epoch:03}.pth", map_location=torch.device(device))
+        )
 
     # Define the loss function and optimizer
     criterion = nn.CrossEntropyLoss()

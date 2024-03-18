@@ -3,11 +3,11 @@ from typing import Union, cast
 
 import networkx as nx  # Import the missing package
 import torch
+import uvicorn
 from fastapi import FastAPI, UploadFile
 from networkx import DiGraph
 from PIL import Image
 from pydantic import BaseModel
-import uvicorn
 
 from locus.models.model import LDoGIResnet
 from locus.models.transforms import LDoGItransforms
