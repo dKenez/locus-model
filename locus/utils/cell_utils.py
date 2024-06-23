@@ -197,7 +197,7 @@ def distance_to_cell_center(lat: float, lon: float, cell: str):
 def distance_to_cell_bounds(lat: float, lon: float, cell: str):
     """
     Calculate the distance between a latitude-longitude coordinate
-    and a square bounded by south latitude, north latitude,
+    and a cell bounded by south latitude, north latitude,
     west longitude, and east longitude.
     """
 

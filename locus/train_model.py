@@ -454,9 +454,6 @@ def train_model(conf: str, cont: str):
 def main(conf: str, cont: str):
     """
     Train a model using the specified configuration file.
-
-    Args:
-        conf (str): Path to the configuration file.
     """
 
     train_model(conf, cont)

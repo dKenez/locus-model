@@ -137,9 +137,9 @@ def partition_quadtree(tree: QuadTree, conn: connection, tau_min: int, tau_max: 
 
 
 @click.command()
-@click.option("--tau-min", default=50, help="Minimum number of data points in a cell.")
-@click.option("--tau-max", default=2000, help="Maximum number of data points in a cell.")
-@click.option("--data-fraction", default=0.1, help="Fraction of the data to use.")
+@click.option("--tau-min", default=50, show_default=True, help="Minimum number of data points in a cell.")
+@click.option("--tau-max", default=2000, show_default=True, help="Maximum number of data points in a cell.")
+@click.option("--data-fraction", default=0.1, show_default=True, help="Fraction of the data to use.")
 @click.option("--output", default=None, help="Output file for saving the QuadTree.")
 def main(tau_min: int, tau_max: int, data_fraction: float, output: Optional[str]):
     """Generate a quadtree from a dataset of image locations.
