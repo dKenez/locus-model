@@ -46,7 +46,8 @@ class LDoGIResnet(torch.nn.Module):
         self.resnet.fc = nn.Linear(num_features, classes)
 
     def forward(self, x):
-        # Forward pass through the network
-        x = self.resnet(x)
-        # Apply softmax to get probabilities
-        return torch.softmax(x, dim=1)
+        # Forward pass through the network, returning raw logits.
+        # Softmax is deliberately not applied here: nn.CrossEntropyLoss applies
+        # log_softmax internally, so doing it here too would apply it twice.
+        # Consumers that need probabilities (e.g. the API) apply softmax themselves.
+        return self.resnet(x)

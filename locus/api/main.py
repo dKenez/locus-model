@@ -44,7 +44,7 @@ num_classes = len(active_cells)
 model = LDoGIResnet(classes=num_classes, layers=50)
 
 model.load_state_dict(
-    torch.load(MODELS_DIR / "runs/weary-subspace/weights/epoch_003.pth", map_location=torch.device("cpu"))
+    torch.load(MODELS_DIR / "runs/weary-independence/weights/epoch_008.pth", map_location=torch.device("cpu"))
 )
 
 
@@ -61,7 +61,9 @@ async def predict(img: UploadFile):
     # Make a prediction
     model.eval()
     with torch.no_grad():
-        output = model(t_img)
+        logits = model(t_img)
+        # The model returns raw logits; convert to probabilities for the client
+        output = torch.softmax(logits, dim=1)
 
     # Extract the cell predictions
     cell_predictions = [(active_cells[i], float(prob)) for i, prob in enumerate(output[0])]
