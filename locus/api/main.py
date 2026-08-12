@@ -1,4 +1,6 @@
+import os
 from io import BytesIO
+from pathlib import Path
 from typing import cast
 
 import networkx as nx  # Import the missing package
@@ -6,6 +8,7 @@ import torch
 import uvicorn
 from fastapi import FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from networkx import DiGraph
 from PIL import Image
 
@@ -69,6 +72,20 @@ async def predict(img: UploadFile):
     cell_predictions = [(active_cells[i], float(prob)) for i, prob in enumerate(output[0])]
 
     return cell_predictions
+
+
+# Optionally serve the built locus-ui bundle from this same app. When LOCUS_UI_DIR points
+# at a locus-ui `build/` directory, the UI and the API share an origin, so the browser
+# calls /predict/ directly and no CORS negotiation is involved at all. Unset (the local
+# dev case) the API serves only its own endpoints and the UI runs on the vite dev server.
+# The mount must be registered last: it matches every path, so any route declared after it
+# would be shadowed by the static handler.
+_ui_dir = os.environ.get("LOCUS_UI_DIR")
+if _ui_dir:
+    ui_path = Path(_ui_dir)
+    if not ui_path.is_dir():
+        raise RuntimeError(f"LOCUS_UI_DIR is set to {_ui_dir!r}, which is not a directory")
+    app.mount("/", StaticFiles(directory=ui_path, html=True), name="ui")
 
 
 if __name__ == "__main__":
