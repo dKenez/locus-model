@@ -127,7 +127,11 @@ class LDoGIDataset(Dataset):
         sql_string = sql_string.format(insert_string)
         results_df = pl.read_database(sql_string, self.conn)
         # create dictionary of id to index in idx
-        results_df = results_df.with_columns(pl.col("id").map_elements(lambda x: idx.index(x)).alias("order"))
+        # return_dtype is required from polars 1.0 onwards; without it the UDF output type
+        # cannot be inferred and the call raises InvalidOperationError.
+        results_df = results_df.with_columns(
+            pl.col("id").map_elements(lambda x: idx.index(x), return_dtype=pl.Int64).alias("order")
+        )
         results_df = results_df.sort("order")
 
         ids = []

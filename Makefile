@@ -3,8 +3,8 @@
 #################################################################################
 
 PROJECT_NAME = locus-model
-PYTHON_VERSION = 3.11
-PYTHON_INTERPRETER = python3
+PYTHON_VERSION = 3.12
+PYTHON_INTERPRETER = uv run python
 
 #################################################################################
 # COMMANDS                                                                      #
@@ -13,20 +13,18 @@ PYTHON_INTERPRETER = python3
 ## Set up python interpreter environment
 .PHONY: create_environment
 create_environment:
-	conda create --name $(PROJECT_NAME) python=$(PYTHON_VERSION) --no-default-packages -y
+	uv python install $(PYTHON_VERSION)
 
 ## Install Python Dependencies
 .PHONY: requirements
 requirements:
-	$(PYTHON_INTERPRETER) -m pip install -U pip setuptools wheel
-	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
-	$(PYTHON_INTERPRETER) -m pip install -e .
+	uv sync
 
 ## Install Developer Python Dependencies
 .PHONY: dev_requirements
-dev_requirements: requirements
-	$(PYTHON_INTERPRETER) -m pip install .["dev"]
-	$(PYTHON_INTERPRETER) -m mypy --install-types --non-interactive
+dev_requirements:
+	uv sync --all-groups --all-extras
+	uv run mypy --install-types --non-interactive
 
 ## Delete all compiled Python files
 .PHONY: clean
@@ -52,11 +50,11 @@ data:
 
 .PHONY: build_documentation
 build_documentation: dev_requirements
-	mkdocs build --config-file docs/mkdocs.yaml --site-dir build
+	uv run mkdocs build --config-file docs/mkdocs.yaml --site-dir build
 
 .PHONY: serve_documentation
 serve_documentation: dev_requirements
-	mkdocs serve --config-file docs/mkdocs.yaml
+	uv run mkdocs serve --config-file docs/mkdocs.yaml
 
 #################################################################################
 # Self Documenting Commands                                                     #
