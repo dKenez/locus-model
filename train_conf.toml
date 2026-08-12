@@ -1,15 +1,24 @@
 # Data
 quadtree = "qt_min10_max1000_df10pct.gml" # check available quadtrees in data/processed/LDoGI/quadtrees
-data_fraction = 0.00001                   # 0.1 should be fine, for testing use 0.0001
+# Only shards 0-14 are loaded (449999 rows). The quadtree was generated over ids 1..423390
+# (manifest.json max_id), so this fraction trims to exactly that range: int(449999 * f) = 423390.
+# -> 296373 train / 84678 test images.
+data_fraction = 0.940869
 label_smoothing = false                   # true | false !hyperparameter
 
 # Model
 layers = 50 # 18 | 34 | 50 | 101 | 152 !hyperparameter
 
 # Training
-batch_size = 32 # 32 | 64 | 128 !hyperparameter
-optim = 'sgd'   # 'adam' | 'sgd' !hyperparameter
-epochs = 30     # set to 30 and use early stopping
-lr = 0.001      # 0.01 | 0.001 | 0.0001 !hyperparameter
+# batch_size is what fits in GPU memory at once; accum_steps multiplies it into the
+# effective batch. 32 x 4 = 128, the effective batch the thesis tuned lr = 0.001 against,
+# but with the memory footprint of a batch of 32.
+# Measured on the RTX 3060 Laptop (6GB) with the desktop running: batch 32 peaks at
+# 3510 MiB reserved against 4748 MiB free. Batch 48 needs 4630 MiB and 64 OOMs.
+batch_size = 32  # 16 | 32 | 64 | 128 !hyperparameter
+accum_steps = 4  # gradient accumulation; effective batch = batch_size * accum_steps
+optim = 'sgd'    # 'adam' | 'sgd' !hyperparameter
+epochs = 8       # thesis found the best model at epoch 3, MSE rises after
+lr = 0.001       # 0.01 | 0.001 | 0.0001 !hyperparameter — tuned for effective batch 128
 
-grace_period = 30 # grace period for early stopping
+grace_period = 3 # grace period for early stopping

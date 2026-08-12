@@ -47,7 +47,8 @@ def train_model(conf: str, cont: str):
 
     if not runs_manifest.exists():
         runs_manifest.write_text(
-            "name,run_start,quadtree,data_fraction,label_smoothing,layers,batch_size,optim,epochs,lr,grace_period\n"
+            "name,run_start,quadtree,data_fraction,label_smoothing,layers,batch_size,accum_steps,"
+            "optim,epochs,lr,grace_period\n"
         )
 
     hyperparams = Hyperparams(Path(conf))
@@ -102,6 +103,7 @@ def train_model(conf: str, cont: str):
             hyperparams.label_smoothing,
             hyperparams.layers,
             hyperparams.batch_size,
+            hyperparams.accum_steps,
             hyperparams.optim,
             hyperparams.epochs,
             hyperparams.lr,
@@ -228,7 +230,11 @@ def train_model(conf: str, cont: str):
     # Define the number of epochs
     num_epochs = hyperparams.epochs
 
-    logger.info(f"Batch size: {hyperparams.batch_size}")
+    # Accumulate gradients over several micro-batches before stepping, so the effective
+    # batch size can exceed what fits in GPU memory at once.
+    accum_steps = max(1, hyperparams.accum_steps)
+
+    logger.info(f"Batch size: {hyperparams.batch_size} x {accum_steps} = {hyperparams.batch_size * accum_steps}")
     logger.info(f"Training data: {len(train_data)} datapoints in {len(train_loader)} batches")
     logger.info(f"Test data    : {len(test_data)} datapoints in {len(test_loader)} batches")
 
@@ -243,6 +249,7 @@ def train_model(conf: str, cont: str):
         "label_smoothing": hyperparams.label_smoothing,
         "layers": hyperparams.layers,
         "batch_size": hyperparams.batch_size,
+        "accum_steps": accum_steps,
         "optim": hyperparams.optim,
         "epochs": hyperparams.epochs,
         "lr": hyperparams.lr,
@@ -311,6 +318,11 @@ def train_model(conf: str, cont: str):
         # Train the model on the training set
         model.train()
 
+        # Start each epoch with clean gradients, since the optimizer is now stepped on a
+        # different cadence to the loop.
+        optimizer.zero_grad()
+        micro_step = 0
+
         for ids, inputs, labels, label_names, coordinates in EpochProgress(
             train_loader,
             desc="train",
@@ -325,20 +337,31 @@ def train_model(conf: str, cont: str):
             inputs = inputs.to(device)
             labels = labels.to(device)
 
-            # Zero the parameter gradients
-            optimizer.zero_grad()
-
-            # Forward + backward + optimize
+            # Forward + backward. The loss is divided by accum_steps so that the gradients
+            # accumulated across the group average out to the same value a single batch of
+            # batch_size * accum_steps would have produced.
             outputs = model(inputs)
             loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+            (loss / accum_steps).backward()
 
-            # Update the training loss
+            # Only step once a full group of micro-batches has been accumulated
+            micro_step += 1
+            if micro_step % accum_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+
+            # Update the training loss, using the unscaled loss so the reported figure stays
+            # comparable across different accum_steps settings
             epoch_stat_dict["train_loss"] += loss.item() * inputs.size(0)
 
             train_model_end = time.time()
             epoch_stat_dict["train_model_time"] += data_fetch_end - epoch_start
+
+        # The epoch rarely divides evenly into accumulation groups; apply whatever gradients
+        # are left over rather than discarding the final partial group.
+        if micro_step % accum_steps != 0:
+            optimizer.step()
+            optimizer.zero_grad()
 
         train_end = time.time()
         epoch_stat_dict["train_time"] = train_end - epoch_start

@@ -92,6 +92,7 @@ class TrainStats(TypedDict):
     epochs: int
     lr: float
     grace_period: int
+    accum_steps: int
 
     stopped_early: bool
     last_epoch: int

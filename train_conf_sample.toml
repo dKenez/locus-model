@@ -7,7 +7,8 @@ label_smoothing = false                    # true | false !hyperparameter
 layers = 50 # 18 | 34 | 50 | 101 | 152 !hyperparameter
 
 # Training
-batch_size = 32 # 32 | 64 | 128 !hyperparameter
+batch_size = 32 # 16 | 32 | 64 | 128 !hyperparameter
+accum_steps = 1 # gradient accumulation; effective batch = batch_size * accum_steps
 optim = 'sgd'   # 'adam' | 'sgd' !hyperparameter
 epochs = 30     # set to 30 and use early stopping
 lr = 0.01       # 0.01 | 0.001 | 0.0001 !hyperparameter

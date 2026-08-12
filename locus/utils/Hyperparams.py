@@ -32,6 +32,11 @@ class Hyperparams:
 
         self.grace_period = conf_dict["grace_period"]
 
+        # Number of micro-batches to accumulate gradients over before stepping the
+        # optimizer. The effective batch size is batch_size * accum_steps. Defaults to 1
+        # so configs and run.json files predating this option still load.
+        self.accum_steps = conf_dict.get("accum_steps", 1)
+
 
 if __name__ == "__main__":
     from locus.utils.paths import PROJECT_ROOT
