@@ -57,7 +57,10 @@ async def predict(img: UploadFile):
     # Read and transform the image
     img_read = await img.read()
     img_bytes = BytesIO(img_read)
-    pil_img = Image.open(img_bytes)
+    # Force three channels. The normalize step carries per-channel means for RGB, so a
+    # PNG with an alpha channel (4) or a greyscale photo (1) otherwise fails the tensor
+    # broadcast. Screenshots are a likely upload, and those are routinely RGBA.
+    pil_img = Image.open(img_bytes).convert("RGB")
     t_img = LDoGItransforms(pil_img)
     t_img = t_img.unsqueeze(0)
 
